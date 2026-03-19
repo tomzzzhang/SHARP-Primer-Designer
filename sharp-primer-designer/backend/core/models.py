@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 # ─── Condition profiles ────────────────────────────────────────────────────────
@@ -37,6 +37,16 @@ class PrimerConstraints(BaseModel):
     max_self_end_complementarity: float = 47.0
     max_hairpin_th: float = 47.0
 
+    @model_validator(mode="after")
+    def check_min_opt_max(self):
+        for prefix in ("length", "tm", "gc"):
+            lo = getattr(self, f"{prefix}_min")
+            opt = getattr(self, f"{prefix}_opt")
+            hi = getattr(self, f"{prefix}_max")
+            if not (lo <= opt <= hi):
+                raise ValueError(f"{prefix}: must satisfy min ({lo}) <= opt ({opt}) <= max ({hi})")
+        return self
+
 
 class PairConstraints(BaseModel):
     max_tm_diff: float = 3.0
@@ -48,6 +58,14 @@ class AmpliconConstraints(BaseModel):
     size_min: int = 100
     size_opt: int = 200
     size_max: int = 500
+
+    @model_validator(mode="after")
+    def check_min_opt_max(self):
+        if not (self.size_min <= self.size_opt <= self.size_max):
+            raise ValueError(
+                f"Amplicon size: must satisfy min ({self.size_min}) <= opt ({self.size_opt}) <= max ({self.size_max})"
+            )
+        return self
 
 
 class SpecificityConfig(BaseModel):
