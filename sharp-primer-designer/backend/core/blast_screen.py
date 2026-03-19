@@ -6,6 +6,7 @@ BLAST_DB_DIR is resolved relative to this file's location at runtime.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import tempfile
 import os
@@ -32,6 +33,13 @@ def screen_primer(
     Returns list of hits filtered by min_alignment_length.
     Returns empty list if BLAST DB does not exist.
     """
+    if not primer_seq or len(primer_seq) > 200:
+        raise ValueError("primer_seq must be 1-200 characters")
+    if not re.fullmatch(r"[ACGTNacgtn]+", primer_seq):
+        raise ValueError("primer_seq must contain only ACGTN characters")
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,99}", genome_id):
+        raise ValueError(f"Invalid genome_id: {genome_id}")
+
     db_path = BLAST_DB_DIR / genome_id / genome_id
     if not db_path.with_suffix(".nhr").exists() and not db_path.with_suffix(".nin").exists():
         return []

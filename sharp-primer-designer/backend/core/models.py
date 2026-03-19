@@ -199,6 +199,14 @@ class AddGenomeRequest(BaseModel):
     sequence: Optional[str] = None   # Pasted FASTA or raw sequence
     fasta_file: Optional[str] = None  # Base64-encoded FASTA
 
+    @field_validator("id")
+    @classmethod
+    def validate_genome_id(cls, v: str) -> str:
+        import re
+        if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,99}", v):
+            raise ValueError("Genome ID must be 1-100 alphanumeric/underscore/dash/dot characters")
+        return v
+
 
 # ─── Saved sequences ─────────────────────────────────────────────────────────
 
