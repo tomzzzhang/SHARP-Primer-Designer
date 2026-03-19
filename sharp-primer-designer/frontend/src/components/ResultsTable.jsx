@@ -8,10 +8,17 @@ function SpecificityBadge({ status }) {
 
 function CopyButton({ text }) {
   const [copied, setCopied] = React.useState(false)
+  const timeoutRef = React.useRef(null)
+
+  React.useEffect(() => {
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }
+  }, [])
+
   function handleCopy() {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setCopied(false), 1200)
     })
   }
   return (

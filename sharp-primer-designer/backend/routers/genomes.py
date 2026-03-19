@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -14,6 +15,14 @@ from core.blast_screen import BLAST_DB_DIR, index_genome
 from core.models import AddGenomeRequest, GenomeInfo, GenomesResponse
 
 router = APIRouter(prefix="/api/genomes", tags=["genomes"])
+
+_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,99}$")
+
+
+def _validate_genome_id(genome_id: str) -> None:
+    """Raise 400 if genome_id contains path-traversal or invalid characters."""
+    if not _SAFE_ID_RE.fullmatch(genome_id):
+        raise HTTPException(400, "Invalid genome ID: must be 1-100 alphanumeric/underscore/dash/dot characters")
 
 
 def _count_fasta_bases(fasta_path: Path) -> int:
@@ -54,6 +63,7 @@ def list_genomes():
 
 @router.post("", response_model=GenomeInfo, status_code=201)
 def add_genome(req: AddGenomeRequest):
+    _validate_genome_id(req.id)
     genome_dir = BLAST_DB_DIR / req.id
     if genome_dir.exists():
         raise HTTPException(400, f"Genome '{req.id}' already exists")
@@ -94,6 +104,7 @@ def add_genome(req: AddGenomeRequest):
 
 @router.delete("/{genome_id}", status_code=204)
 def delete_genome(genome_id: str):
+    _validate_genome_id(genome_id)
     genome_dir = BLAST_DB_DIR / genome_id
     if not genome_dir.exists():
         raise HTTPException(404, f"Genome '{genome_id}' not found")

@@ -56,11 +56,13 @@ export default function TemplateMap({ pairs, templateLength, targetRegion, selec
   const trackW = SVG_W - PAD_LEFT - PAD_RIGHT
 
   function toX(pos) {
+    if (templateLength <= 0) return PAD_LEFT
     return PAD_LEFT + (pos / templateLength) * trackW
   }
 
   // Axis ticks — ~6 evenly spaced
   const ticks = useMemo(() => {
+    if (templateLength <= 0) return []
     const count = 6
     const step = Math.ceil(templateLength / count / 1000) * 1000 || 1
     const ts = []

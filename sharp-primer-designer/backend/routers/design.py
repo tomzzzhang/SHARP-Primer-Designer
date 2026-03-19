@@ -33,7 +33,7 @@ def _load_all_profiles() -> list[ConditionProfile]:
     return [ConditionProfile(**p) for p in data["profiles"]]
 
 
-def _resolve_template(req: DesignRequest) -> tuple[str, TemplateInfo]:
+def _resolve_template(req: DesignRequest) -> tuple[str, TemplateInfo, tuple[int, int] | None]:
     """Resolve the template input to a plain uppercase sequence + TemplateInfo."""
     t = req.template
 
