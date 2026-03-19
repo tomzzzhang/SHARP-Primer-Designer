@@ -1,0 +1,227 @@
+"""Pydantic models for all request/response types."""
+
+from __future__ import annotations
+from typing import Optional
+from pydantic import BaseModel, field_validator
+
+
+# ─── Condition profiles ────────────────────────────────────────────────────────
+
+class ConditionProfile(BaseModel):
+    id: str
+    name: str
+    na_mm: float = 50.0
+    k_mm: float = 0.0
+    tris_mm: float = 0.0
+    mg_mm: float = 2.0
+    dntps_mm: float = 0.8
+    primer_nm: float = 200.0
+    is_default: bool = False
+    editable: bool = True
+
+
+# ─── Design constraints ────────────────────────────────────────────────────────
+
+class PrimerConstraints(BaseModel):
+    length_min: int = 17
+    length_opt: int = 22
+    length_max: int = 28
+    tm_min: float = 54.0
+    tm_opt: float = 62.0
+    tm_max: float = 68.0
+    gc_min: float = 30.0
+    gc_opt: float = 50.0
+    gc_max: float = 70.0
+    max_poly_x: int = 4
+    max_self_complementarity: float = 47.0
+    max_self_end_complementarity: float = 47.0
+    max_hairpin_th: float = 47.0
+
+
+class PairConstraints(BaseModel):
+    max_tm_diff: float = 3.0
+    max_pair_complementarity: float = 47.0
+    max_pair_end_complementarity: float = 47.0
+
+
+class AmpliconConstraints(BaseModel):
+    size_min: int = 100
+    size_opt: int = 200
+    size_max: int = 500
+
+
+class SpecificityConfig(BaseModel):
+    genome_ids: list[str] = []
+    enabled: bool = True
+    evalue_threshold: float = 1000
+    min_alignment_length: int = 15
+    max_off_targets: int = 0
+
+
+# ─── Template input ────────────────────────────────────────────────────────────
+
+class TemplateInput(BaseModel):
+    sequence: Optional[str] = None          # Direct sequence (ACGT)
+    fasta_file: Optional[str] = None        # Base64-encoded FASTA
+    accession: Optional[str] = None         # NCBI accession
+    target_start: Optional[int] = None      # 1-indexed
+    target_length: Optional[int] = None
+    excluded_regions: Optional[list[list[int]]] = None  # [[start, length], ...]
+
+
+class ReactionConditions(BaseModel):
+    primary_profile_id: str = "sharp_cutsmart"
+    additional_profile_ids: list[str] = []
+
+
+# ─── BLAST results ─────────────────────────────────────────────────────────────
+
+class BlastHit(BaseModel):
+    subject_id: str
+    subject_start: int
+    subject_end: int
+    percent_identity: float
+    alignment_length: int
+    mismatches: int
+    evalue: float
+    bitscore: float
+    query_start: int
+    query_end: int
+    strand: str  # "plus" or "minus"
+
+
+class OffTargetAmplicon(BaseModel):
+    subject: str
+    fwd_pos: int
+    rev_pos: int
+    size: int
+
+
+# ─── Tm results ───────────────────────────────────────────────────────────────
+
+class TmGrid(BaseModel):
+    """Tm values indexed by [method][profile_id].
+    Wallace is condition-independent — single value stored under key '_'.
+    """
+    santalucia_primer3: dict[str, float] = {}
+    santalucia_biopython: dict[str, float] = {}
+    owczarzy_2008: dict[str, float] = {}
+    wallace: dict[str, float] = {}  # Always {"_": value}
+
+
+# ─── Primer / pair results ─────────────────────────────────────────────────────
+
+class PrimerResult(BaseModel):
+    sequence: str
+    start: int        # 1-indexed (converted from primer3's 0-indexed)
+    end: int          # 1-indexed, inclusive
+    length: int
+    gc_percent: float
+    tm_grid: TmGrid
+    hairpin_dg: float   # kcal/mol
+    hairpin_tm: float
+    homodimer_dg: float
+    homodimer_tm: float
+    end_stability: float
+    blast_hits: list[BlastHit] = []
+
+
+class PairResult(BaseModel):
+    rank: int
+    penalty_score: float
+    forward: PrimerResult
+    reverse: PrimerResult
+    amplicon_size: int
+    heterodimer_dg: float
+    heterodimer_tm: float
+    tm_diff: dict[str, dict[str, float]]  # [method][profile] -> abs diff
+    specificity_status: str = "not_screened"  # "pass", "fail", "not_screened"
+    off_target_amplicons: list[OffTargetAmplicon] = []
+
+
+# ─── API request / response ────────────────────────────────────────────────────
+
+class DesignRequest(BaseModel):
+    template: TemplateInput
+    primer_constraints: PrimerConstraints = PrimerConstraints()
+    pair_constraints: PairConstraints = PairConstraints()
+    amplicon_constraints: AmpliconConstraints = AmpliconConstraints()
+    reaction_conditions: ReactionConditions = ReactionConditions()
+    specificity: SpecificityConfig = SpecificityConfig()
+    num_pairs: int = 10
+
+
+class TemplateInfo(BaseModel):
+    name: str
+    length: int
+    accession: Optional[str] = None
+    target_region: Optional[list[int]] = None  # [start, end] 1-indexed
+
+
+class DesignMetadata(BaseModel):
+    primer3_version: str
+    blast_version: Optional[str] = None
+    total_candidates_screened: int
+    filtered_by_blast: int
+    blast_coverage_warning: bool = False
+    timestamp: str
+
+
+class DesignResponse(BaseModel):
+    template_info: TemplateInfo
+    pairs: list[PairResult]
+    design_metadata: DesignMetadata
+
+
+# ─── Profile API ──────────────────────────────────────────────────────────────
+
+class ProfilesResponse(BaseModel):
+    profiles: list[ConditionProfile]
+
+
+# ─── Genome API ───────────────────────────────────────────────────────────────
+
+class GenomeInfo(BaseModel):
+    id: str
+    name: str
+    fasta_size_bp: Optional[int] = None
+    indexed: bool
+
+
+class GenomesResponse(BaseModel):
+    genomes: list[GenomeInfo]
+
+
+class AddGenomeRequest(BaseModel):
+    id: str
+    name: str
+    accession: Optional[str] = None
+    sequence: Optional[str] = None   # Pasted FASTA or raw sequence
+    fasta_file: Optional[str] = None  # Base64-encoded FASTA
+
+
+# ─── Saved sequences ─────────────────────────────────────────────────────────
+
+class SavedSequence(BaseModel):
+    id: str
+    name: str
+    sequence: str
+    target_start: Optional[int] = None
+    target_length: Optional[int] = None
+
+
+class SavedSequencesResponse(BaseModel):
+    sequences: list[SavedSequence]
+
+
+# ─── Sequence fetch API ───────────────────────────────────────────────────────
+
+class FetchSequenceRequest(BaseModel):
+    accession: str
+
+
+class FetchSequenceResponse(BaseModel):
+    accession: str
+    name: str
+    length: int
+    sequence: str

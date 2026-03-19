@@ -1,0 +1,46 @@
+"""SHARP Primer Designer — FastAPI backend entry point."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from routers import design, genomes, profiles, sequence, sequences
+
+# Load .env from repo root (one level above backend/)
+_ROOT = Path(__file__).parent.parent
+load_dotenv(_ROOT / ".env")
+
+app = FastAPI(
+    title="SHARP Primer Designer API",
+    description=(
+        "Primer design engine for SHARP Diagnostics isothermal amplification platform. "
+        "Wraps primer3-py with multi-method Tm analysis and BLAST+ off-target screening."
+    ),
+    version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(design.router)
+app.include_router(profiles.router)
+app.include_router(genomes.router)
+app.include_router(sequence.router)
+app.include_router(sequences.router)
+
+
+@app.get("/health")
+def health():
+    from core.blast_screen import blast_version
+    bv = blast_version()
+    return {"status": "ok", "blast_available": bv is not None, "blast_version": bv}

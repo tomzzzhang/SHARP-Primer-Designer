@@ -1,0 +1,52 @@
+{
+  "profiles": [
+    {
+      "id": "sharp_cutsmart",
+      "name": "SHARP CutSmart",
+      "na_mm": 50.0,
+      "k_mm": 0.0,
+      "tris_mm": 0.0,
+      "mg_mm": 2.0,
+      "dntps_mm": 0.8,
+      "primer_nm": 200.0,
+      "is_default": true,
+      "editable": true
+    },
+    {
+      "id": "idt_oligoanalyzer",
+      "name": "IDT OligoAnalyzer",
+      "na_mm": 50.0,
+      "k_mm": 0.0,
+      "tris_mm": 0.0,
+      "mg_mm": 3.0,
+      "dntps_mm": 0.8,
+      "primer_nm": 200.0,
+      "is_default": false,
+      "editable": true
+    },
+    {
+      "id": "idt_primerquest_sharp",
+      "name": "IDT PrimerQuest (SHARP params)",
+      "na_mm": 50.0,
+      "k_mm": 0.0,
+      "tris_mm": 0.0,
+      "mg_mm": 2.0,
+      "dntps_mm": 2.0,
+      "primer_nm": 500.0,
+      "is_default": false,
+      "editable": true
+    },
+    {
+      "id": "neb_standard_pcr",
+      "name": "NEB Standard PCR",
+      "na_mm": 50.0,
+      "k_mm": 0.0,
+      "tris_mm": 0.0,
+      "mg_mm": 1.5,
+      "dntps_mm": 0.8,
+      "primer_nm": 200.0,
+      "is_default": false,
+      "editable": true
+    }
+  ]
+}

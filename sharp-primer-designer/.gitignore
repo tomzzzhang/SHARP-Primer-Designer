@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+backend/venv/
+.venv/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# BLAST databases (large binary files, rebuilt by setup)
+backend/data/genomes/*/
+
+# Environment / secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
