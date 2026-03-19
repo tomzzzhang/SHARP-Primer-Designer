@@ -201,7 +201,10 @@ export default function App() {
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          buffer += decoder.decode() // flush remaining bytes
+          break
+        }
         buffer += decoder.decode(value, { stream: true })
 
         // Parse SSE lines from buffer
@@ -217,7 +220,15 @@ export default function App() {
             dataLine = line.slice(6).trim()
           } else if (line === '' && eventType && dataLine) {
             // Dispatch the event
-            const data = JSON.parse(dataLine)
+            let data
+            try {
+              data = JSON.parse(dataLine)
+            } catch (parseErr) {
+              console.warn('SSE JSON parse error:', parseErr, dataLine)
+              eventType = null
+              dataLine = null
+              continue
+            }
             if (eventType === 'progress') {
               setProgress(data)
             } else if (eventType === 'done') {
