@@ -8,6 +8,12 @@ import ProfileManager from './components/ProfileManager'
 import ProgressBar from './components/ProgressBar'
 import ParameterReference from './components/ParameterReference'
 import TemplateMap from './components/TemplateMap'
+
+function extractApiError(err, fallback) {
+  const d = err.detail
+  if (Array.isArray(d)) return d.map((e) => e.msg).join('; ')
+  return d || fallback
+}
 import { getProfiles, getGenomes, getSequences, saveSequence, deleteSequence } from './api/client'
 import {
   DEFAULT_PRIMER_CONSTRAINTS,
@@ -244,7 +250,7 @@ export default function App() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || res.statusText)
+        throw new Error(extractApiError(err, res.statusText))
       }
 
       const reader = res.body.getReader()
@@ -331,7 +337,7 @@ export default function App() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || res.statusText)
+        throw new Error(extractApiError(err, res.statusText))
       }
       // Download the zip file
       const blob = await res.blob()
@@ -368,7 +374,7 @@ export default function App() {
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err.detail || res.statusText)
+          throw new Error(extractApiError(err, res.statusText))
         }
         const data = await res.json()
         setResults(data)
