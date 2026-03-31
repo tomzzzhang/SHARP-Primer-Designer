@@ -2,7 +2,7 @@
 **Branch:** `feature/v1-workflow`
 **Repo:** `tomzzzhang/SHARP-Primer-Designer`
 **Version key:** K42
-**Last updated:** 2026-03-31
+**Last updated:** 2026-03-31 (K43)
 
 Read `PRIMER_DESIGNER_CONTEXT.md` for product/company context. This document is the coding session handoff — what was built, how it works, every design decision, and current state.
 
@@ -20,12 +20,14 @@ sharp-primer-designer/
 │   │   ├── blast_screen.py   BLAST subprocess wrapper, batch screening, Tm filtering
 │   │   └── tm_analysis.py    4-method Tm calculation (unchanged this session)
 │   ├── routers/
+│   │   ├── configs.py        Design config presets CRUD (K43)
 │   │   ├── design.py         POST /api/design (SSE streaming + sync fallback)
 │   │   ├── export.py         POST /api/export (zip download), POST /api/import
 │   │   ├── genomes.py        Genome CRUD
 │   │   ├── profiles.py       Condition profile CRUD
 │   │   └── sequences.py      Saved sequences CRUD
 │   └── data/
+│       ├── configs.json      Saved design configs / parameter presets (K43)
 │       ├── profiles.json     Condition profiles (loaded fresh per request)
 │       ├── genomes/          BLAST databases
 │       └── sequences.json    Saved sequences library
@@ -48,6 +50,32 @@ sharp-primer-designer/
 ---
 
 ## What Was Built This Session
+
+### 0. Bug Fix: `[object Object]` Error Display (K43)
+
+When FastAPI/Pydantic validation errors occurred, the frontend displayed `[object Object]` instead of a readable message. Root cause: `err.detail` from Pydantic is an array of objects, not a string. Added `extractApiError()` helper in `App.jsx` that detects array `detail` and extracts `.msg` from each item. Applied to all three API error sites (design, export, import).
+
+**File:** `frontend/src/App.jsx` — lines 12–16 (helper), lines 253, 339, 376 (usage)
+
+---
+
+### 0b. Save/Load Design Configs (K43)
+
+Server-side persistence for named parameter configurations (presets). Saves all constraint values, enabled flags, diversity mode, num pairs, reaction conditions, BLAST settings, and off-target Tm threshold. Follows the exact same CRUD pattern as saved sequences.
+
+**Backend:**
+- `DesignConfig` and `DesignConfigsResponse` models in `core/models.py`
+- `routers/configs.py` — GET/POST/PUT/DELETE at `/api/configs`
+- `data/configs.json` — JSON file storage
+
+**Frontend:**
+- API client methods in `api/client.js`: `getConfigs`, `saveConfigApi`, `updateConfigApi`, `deleteConfigApi`
+- State + handlers in `App.jsx`: `savedConfigs`, `handleSaveConfig`, `handleUpdateConfig`, `handleLoadConfig`, `handleDeleteConfig`
+- UI in `ConstraintsPanel.jsx`: name input + Save button at top of panel, scrollable list with click-to-load, hover-reveal Update and Delete buttons
+
+**Loading a config sets:** `primerConstraints`, `pairConstraints`, `ampliconConstraints`, `enabledConstraints`, `numPairs`, `diversityMode`, `reactionConditions`, `blastEnabled`, `selectedGenomeIds`, `offTargetTmThreshold`
+
+---
 
 ### 1. Constraint Enable/Disable Checkboxes
 
@@ -168,7 +196,7 @@ The code was using `SEQUENCE_TARGET`. Changed to `SEQUENCE_INCLUDED_REGION`. Thi
 
 **To update:** edit `version.txt`. Everything else picks it up automatically on next restart/reload.
 
-Current key: **K42**
+Current key: **K43**
 
 ---
 
