@@ -40,6 +40,12 @@ export const getGenomes = () => request('GET', '/genomes')
 export const addGenome = (payload) => request('POST', '/genomes', payload)
 export const deleteGenome = (id) => request('DELETE', `/genomes/${id}`)
 
+// ── Design configs (parameter presets) ───────────────────────────────────────
+export const getConfigs = () => request('GET', '/configs')
+export const saveConfigApi = (payload) => request('POST', '/configs', payload)
+export const updateConfigApi = (id, payload) => request('PUT', `/configs/${id}`, payload)
+export const deleteConfigApi = (id) => request('DELETE', `/configs/${id}`)
+
 // ── Saved sequences ──────────────────────────────────────────────────────────
 export const getSequences = () => request('GET', '/sequences')
 export const saveSequence = (payload) => request('POST', '/sequences', payload)

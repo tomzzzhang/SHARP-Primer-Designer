@@ -1,7 +1,13 @@
-"""BLAST+ off-target specificity screening.
+"""BLAST+ off-target specificity screening with thermodynamic filtering.
 
 Uses subprocess calls to NCBI BLAST+ command-line tools (blastn, makeblastdb).
 BLAST_DB_DIR is resolved relative to this file's location at runtime.
+
+Thermodynamic filtering: each BLAST hit is evaluated for binding Tm under
+the actual reaction conditions (salt, Mg, dNTPs, primer concentration).
+Only hits with Tm above a threshold are considered viable binding sites.
+If both primers have exactly one viable site each, the pair passes without
+geometry checking. Multiple viable sites trigger off-target amplicon geometry checks.
 """
 
 from __future__ import annotations
@@ -12,11 +18,63 @@ import tempfile
 import os
 from pathlib import Path
 
-from .models import BlastHit, OffTargetAmplicon
+import primer3
+
+from .models import BlastHit, ConditionProfile, OffTargetAmplicon
 
 # Resolved at import time relative to this module's location
 _HERE = Path(__file__).parent.parent
 BLAST_DB_DIR = _HERE / "data" / "genomes"
+
+
+# ─── Thermodynamic Tm for a BLAST hit ────────────────────────────────────────
+
+def _complement(seq: str) -> str:
+    """Return complement (NOT reverse complement) of a DNA sequence."""
+    table = str.maketrans("ACGTacgt", "TGCAtgca")
+    return seq.translate(table)
+
+
+def calc_hit_tm(
+    hit: BlastHit,
+    profile: ConditionProfile,
+) -> float:
+    """Calculate Tm for a primer binding at a BLAST hit site.
+
+    Uses primer3.calc_heterodimer on the aligned query and subject sequences
+    under the reaction's salt/Mg/dNTP/primer concentration conditions.
+
+    For plus-strand hits: primer binds the complement of sseq.
+    For minus-strand hits: primer binds sseq directly.
+    Either way, calc_heterodimer handles finding the best alignment internally.
+    """
+    qseq = hit.qseq.replace("-", "")  # remove gaps
+    sseq = hit.sseq.replace("-", "")
+
+    if not qseq or not sseq:
+        return 0.0
+
+    # calc_heterodimer wants two single-stranded sequences that might bind.
+    # For a plus-strand hit, the primer (qseq) binds the complement of the
+    # subject. We pass qseq and the reverse-complement of sseq so primer3
+    # can evaluate the duplex.
+    if hit.strand == "plus":
+        target = _complement(sseq)[::-1]  # reverse complement of sseq
+    else:
+        target = sseq[::-1]  # reverse of sseq (already complementary)
+
+    try:
+        result = primer3.calc_heterodimer(
+            qseq,
+            target,
+            mv_conc=profile.na_mm + profile.k_mm,
+            dv_conc=profile.mg_mm,
+            dntp_conc=profile.dntps_mm,
+            dna_conc=profile.primer_nm,
+        )
+        return round(result.tm, 1)
+    except Exception:
+        return 0.0
 
 
 # ─── BLAST search ─────────────────────────────────────────────────────────────
@@ -44,6 +102,10 @@ def screen_primer(
     if not db_path.with_suffix(".nhr").exists() and not db_path.with_suffix(".nin").exists():
         return []
 
+    # Adjust min alignment length for short primers
+    effective_min_len = min(min_alignment_length, len(primer_seq) - 2)
+    effective_min_len = max(effective_min_len, 7)  # absolute floor
+
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".fasta", delete=False
     ) as f:
@@ -59,7 +121,7 @@ def screen_primer(
             "-evalue", str(evalue),
             "-word_size", str(word_size),
             "-outfmt",
-            "6 sseqid sstart send pident length mismatch gapopen evalue bitscore qstart qend sstrand",
+            "6 sseqid sstart send pident length mismatch gapopen evalue bitscore qstart qend sstrand qseq sseq",
             "-dust", "no",
             "-num_threads", "2",
         ]
@@ -68,7 +130,7 @@ def screen_primer(
         os.unlink(query_path)
 
     hits = _parse_blast_tabular(result.stdout)
-    return [h for h in hits if h.alignment_length >= min_alignment_length]
+    return [h for h in hits if h.alignment_length >= effective_min_len]
 
 
 def _parse_blast_tabular(output: str) -> list[BlastHit]:
@@ -77,7 +139,7 @@ def _parse_blast_tabular(output: str) -> list[BlastHit]:
         if not line or line.startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) < 12:
+        if len(parts) < 14:
             continue
         try:
             hit = BlastHit(
@@ -92,11 +154,36 @@ def _parse_blast_tabular(output: str) -> list[BlastHit]:
                 query_start=int(parts[9]),
                 query_end=int(parts[10]),
                 strand="plus" if parts[11].strip() == "plus" else "minus",
+                qseq=parts[12],
+                sseq=parts[13],
             )
             hits.append(hit)
         except (ValueError, IndexError):
             continue
     return hits
+
+
+# ─── Thermodynamic hit filtering ─────────────────────────────────────────────
+
+def filter_hits_by_tm(
+    hits: list[BlastHit],
+    profile: ConditionProfile,
+    tm_threshold: float = 45.0,
+) -> list[BlastHit]:
+    """Keep only hits whose binding Tm >= threshold under reaction conditions.
+
+    Also annotates each hit with its calculated hit_tm.
+    A threshold of ~45°C is conservative — well below the 65°C reaction
+    temperature, but filters out very weak partial matches that could
+    never bind under any reasonable condition.
+    """
+    viable = []
+    for hit in hits:
+        tm = calc_hit_tm(hit, profile)
+        hit.hit_tm = tm
+        if tm >= tm_threshold:
+            viable.append(hit)
+    return viable
 
 
 # ─── Off-target amplicon detection ────────────────────────────────────────────
@@ -115,9 +202,7 @@ def check_pair_off_target_amplicons(
 
     On-target exclusion: if expected_amplicon_size is provided, any detected
     amplicon whose size falls within size_tolerance_pct of expected_amplicon_size
-    is considered the intended on-target product and is excluded. This prevents
-    the designed amplicon from being flagged as "off-target" when the BLAST DB
-    contains the same sequence as the template (the most common use case).
+    is considered the intended on-target product and is excluded.
     """
     amplicons = []
     tol = int((expected_amplicon_size or 0) * size_tolerance_pct)
@@ -141,6 +226,164 @@ def check_pair_off_target_amplicons(
                         size=amplicon_size,
                     ))
     return amplicons
+
+
+def screen_primers_batch(
+    primer_seqs: list[str],
+    genome_id: str,
+    evalue: float = 1000,
+    word_size: int = 7,
+    min_alignment_length: int = 15,
+) -> dict[str, list[BlastHit]]:
+    """BLAST multiple primer sequences in a single subprocess call.
+
+    Returns dict mapping each primer sequence to its list of hits.
+    Much faster than calling screen_primer() individually for each primer.
+    """
+    if not primer_seqs:
+        return {}
+
+    # Deduplicate
+    unique_seqs = list(set(primer_seqs))
+
+    # Validate
+    for seq in unique_seqs:
+        if not seq or len(seq) > 200:
+            continue
+        if not re.fullmatch(r"[ACGTNacgtn]+", seq):
+            continue
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,99}", genome_id):
+        return {s: [] for s in primer_seqs}
+
+    db_path = BLAST_DB_DIR / genome_id / genome_id
+    if not db_path.with_suffix(".nhr").exists() and not db_path.with_suffix(".nin").exists():
+        return {s: [] for s in primer_seqs}
+
+    # Write all primers to one FASTA
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".fasta", delete=False) as f:
+        for i, seq in enumerate(unique_seqs):
+            f.write(f">primer_{i}\n{seq}\n")
+        query_path = f.name
+
+    # Map primer index back to sequence
+    idx_to_seq = {f"primer_{i}": seq for i, seq in enumerate(unique_seqs)}
+
+    try:
+        cmd = [
+            "blastn",
+            "-task", "blastn-short",
+            "-query", query_path,
+            "-db", str(db_path),
+            "-evalue", str(evalue),
+            "-word_size", str(word_size),
+            "-outfmt",
+            "6 qseqid sseqid sstart send pident length mismatch gapopen evalue bitscore qstart qend sstrand qseq sseq",
+            "-dust", "no",
+            "-num_threads", "2",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    finally:
+        os.unlink(query_path)
+
+    # Parse results, group by query
+    hits_by_seq: dict[str, list[BlastHit]] = {s: [] for s in unique_seqs}
+    for line in result.stdout.strip().splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 15:
+            continue
+        try:
+            query_id = parts[0]
+            seq = idx_to_seq.get(query_id)
+            if seq is None:
+                continue
+            eff_min = min(min_alignment_length, len(seq) - 2)
+            eff_min = max(eff_min, 7)
+            aln_len = int(parts[5])
+            if aln_len < eff_min:
+                continue
+            hit = BlastHit(
+                subject_id=parts[1],
+                subject_start=int(parts[2]),
+                subject_end=int(parts[3]),
+                percent_identity=float(parts[4]),
+                alignment_length=aln_len,
+                mismatches=int(parts[6]),
+                evalue=float(parts[8]),
+                bitscore=float(parts[9]),
+                query_start=int(parts[10]),
+                query_end=int(parts[11]),
+                strand="plus" if parts[12].strip() == "plus" else "minus",
+                qseq=parts[13],
+                sseq=parts[14],
+            )
+            hits_by_seq[seq].append(hit)
+        except (ValueError, IndexError):
+            continue
+
+    return hits_by_seq
+
+
+def screen_pair_specificity(
+    fwd_seq: str,
+    rev_seq: str,
+    genome_ids: list[str],
+    profile: ConditionProfile,
+    evalue: float = 1000,
+    min_alignment_length: int = 15,
+    tm_threshold: float = 45.0,
+    max_amplicon_size: int = 2000,
+    expected_amplicon_size: int | None = None,
+    max_off_targets: int = 0,
+) -> tuple[str, list[BlastHit], list[BlastHit], list[OffTargetAmplicon]]:
+    """Full specificity screen for a primer pair with thermodynamic filtering.
+
+    Returns (status, fwd_hits, rev_hits, off_target_amplicons) where:
+    - status: "pass", "fail", or "not_screened"
+    - fwd_hits/rev_hits: all BLAST hits (with hit_tm annotated)
+    - off_target_amplicons: only populated if status == "fail"
+
+    Logic:
+    1. BLAST both primers against all genomes
+    2. Filter hits by Tm — only keep sites that could bind at reaction temperature
+    3. If both primers have exactly 1 viable site → pass (no geometry check needed)
+    4. If multiple viable sites → check geometry for off-target amplicons
+    """
+    all_fwd_hits = []
+    all_rev_hits = []
+
+    for genome_id in genome_ids:
+        all_fwd_hits += screen_primer(fwd_seq, genome_id, evalue=evalue,
+                                       min_alignment_length=min_alignment_length)
+        all_rev_hits += screen_primer(rev_seq, genome_id, evalue=evalue,
+                                       min_alignment_length=min_alignment_length)
+
+    # Annotate all hits with Tm (for display), then filter to viable ones
+    for hit in all_fwd_hits:
+        hit.hit_tm = calc_hit_tm(hit, profile)
+    for hit in all_rev_hits:
+        hit.hit_tm = calc_hit_tm(hit, profile)
+
+    viable_fwd = [h for h in all_fwd_hits if h.hit_tm is not None and h.hit_tm >= tm_threshold]
+    viable_rev = [h for h in all_rev_hits if h.hit_tm is not None and h.hit_tm >= tm_threshold]
+
+    # Fast path: if each primer binds only one site, no off-target possible
+    if len(viable_fwd) <= 1 and len(viable_rev) <= 1:
+        return "pass", all_fwd_hits, all_rev_hits, []
+
+    # Multiple viable sites: check geometry
+    off_targets = check_pair_off_target_amplicons(
+        viable_fwd,
+        viable_rev,
+        max_amplicon_size=max_amplicon_size,
+        expected_amplicon_size=expected_amplicon_size,
+    )
+
+    if len(off_targets) <= max_off_targets:
+        return "pass", all_fwd_hits, all_rev_hits, off_targets
+    else:
+        return "fail", all_fwd_hits, all_rev_hits, off_targets
 
 
 # ─── Genome indexing ──────────────────────────────────────────────────────────

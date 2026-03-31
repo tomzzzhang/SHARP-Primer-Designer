@@ -32,8 +32,10 @@ from .tm_analysis import (
 )
 from .blast_screen import (
     blast_version,
+    calc_hit_tm,
     check_pair_off_target_amplicons,
-    screen_primer,
+    filter_hits_by_tm,
+    screen_primers_batch,
 )
 
 
@@ -50,6 +52,106 @@ def _gc_percent(seq: str) -> float:
     return round(100 * gc / len(seq), 1) if seq else 0.0
 
 
+def _apply_diversity_filter(
+    candidates: list[tuple[float, PairResult]],
+    mode: str,
+    num_return: int,
+    template_length: int = 0,
+) -> list[tuple[float, PairResult]]:
+    """Filter candidates for positional diversity.
+
+    Always deduplicates by primer sequence first — never returns the same
+    forward or reverse sequence twice regardless of mode.
+
+    Modes:
+    - "off": dedup only, pure penalty ranking
+    - "sparse": penalty-first, 10 bp min spacing between both fwd and rev starts
+    - "spread": penalty-first, 25 bp min spacing
+    - "coverage": round-robin across amplicon-midpoint bins, then penalty within bin
+    """
+    if not candidates:
+        return candidates
+
+    # ── Always deduplicate by sequence ────────────────────────────────────────
+    # primer3 often converges on one optimal fwd or rev primer and pairs it with
+    # many partners. Never return the same forward or reverse sequence twice.
+    seen_fwd: set[str] = set()
+    seen_rev: set[str] = set()
+    deduped: list[tuple[float, PairResult]] = []
+    for penalty, pair in candidates:
+        if pair.forward.sequence not in seen_fwd and pair.reverse.sequence not in seen_rev:
+            seen_fwd.add(pair.forward.sequence)
+            seen_rev.add(pair.reverse.sequence)
+            deduped.append((penalty, pair))
+    candidates = deduped
+
+    if mode == "off":
+        return candidates
+
+    if mode == "coverage":
+        # Divide the template into num_return equal sections.
+        # For each section, find the candidate whose amplicon center is nearest
+        # to the section center, using quality (primer3 penalty) to break ties
+        # when multiple candidates are equally well-centered.
+        #
+        # Flat zone: an amplicon can shift from the section center by up to
+        #   flat_radius = max(0, (section_size - avg_amplicon_size) / 2)
+        # without any positional penalty. This handles the case where amplicons
+        # are much smaller than sections (lots of freedom → quality wins) or
+        # where amplicons are larger than sections (overlaps are unavoidable →
+        # we just pick closest center, quality as tiebreaker).
+        tlen = template_length if template_length > 0 else (
+            max(pair.forward.start + pair.amplicon_size for _, pair in candidates)
+        )
+        n_sections = max(num_return, 1)
+        section_size = tlen / n_sections
+
+        avg_amp = sum(pair.amplicon_size for _, pair in candidates) / len(candidates)
+        flat_radius = max(0.0, (section_size - avg_amp) / 2.0)
+
+        section_centers = [(i + 0.5) * section_size for i in range(n_sections)]
+
+        # Assign each candidate to its nearest section center
+        section_bins: dict[int, list[tuple[float, float, PairResult]]] = {
+            i: [] for i in range(n_sections)
+        }
+        for penalty, pair in candidates:
+            amp_center = pair.forward.start + pair.amplicon_size / 2.0
+            nearest = min(range(n_sections),
+                          key=lambda i: abs(amp_center - section_centers[i]))
+            dist = abs(amp_center - section_centers[nearest])
+            pos_penalty = max(0.0, dist - flat_radius)
+            section_bins[nearest].append((pos_penalty, penalty, pair))
+
+        # From each section pick best: primary = positional fit, secondary = quality
+        result: list[tuple[float, PairResult]] = []
+        for i in range(n_sections):
+            if not section_bins[i]:
+                continue
+            section_bins[i].sort(key=lambda x: (x[0], x[1]))
+            _, pen, pair = section_bins[i][0]
+            result.append((pen, pair))
+        return result
+
+    # "sparse" or "spread" — penalty-first with min spacing on BOTH primers
+    min_spacing = {"sparse": 10, "spread": 25}.get(mode, 10)
+    result = []
+    selected_fwd_starts: list[int] = []
+    selected_rev_starts: list[int] = []
+
+    for penalty, pair in candidates:
+        fwd_s = pair.forward.start
+        rev_s = pair.reverse.start
+        too_close = any(abs(fwd_s - sf) < min_spacing for sf in selected_fwd_starts) or \
+                    any(abs(rev_s - sr) < min_spacing for sr in selected_rev_starts)
+        if not too_close:
+            result.append((penalty, pair))
+            selected_fwd_starts.append(fwd_s)
+            selected_rev_starts.append(rev_s)
+
+    return result
+
+
 def design_primers(
     template_seq: str,
     template_info: TemplateInfo,
@@ -58,10 +160,12 @@ def design_primers(
     primer_constraints: PrimerConstraints,
     pair_constraints: PairConstraints,
     amplicon_constraints: AmpliconConstraints,
-    reaction_conditions: ReactionConditions,
-    all_profiles: list[ConditionProfile],
-    specificity: SpecificityConfig,
+    disabled_constraints: list[str] | None = None,
+    reaction_conditions: ReactionConditions = ReactionConditions(),
+    all_profiles: list[ConditionProfile] | None = None,
+    specificity: SpecificityConfig = SpecificityConfig(),
     num_return: int = 10,
+    diversity_mode: str = "off",
     overshoot_factor: int = 3,
     on_progress=None,  # Optional[Callable[[str, str, float], None]]
 ) -> tuple[list[PairResult], DesignMetadata]:
@@ -86,40 +190,145 @@ def design_primers(
     # ── primer3 call ──────────────────────────────────────────────────────────
     seq_args: dict = {"SEQUENCE_TEMPLATE": template_seq}
     if target_region:
-        seq_args["SEQUENCE_TARGET"] = [list(target_region)]
+        # SEQUENCE_INCLUDED_REGION = design primers within this region
+        # (NOT SEQUENCE_TARGET, which requires primers to flank the region)
+        seq_args["SEQUENCE_INCLUDED_REGION"] = [list(target_region)]
     if excluded_regions:
         seq_args["SEQUENCE_EXCLUDED_REGION"] = [list(r) for r in excluded_regions]
 
-    global_args: dict = {
-        "PRIMER_MIN_SIZE": primer_constraints.length_min,
-        "PRIMER_OPT_SIZE": primer_constraints.length_opt,
-        "PRIMER_MAX_SIZE": primer_constraints.length_max,
-        "PRIMER_MIN_TM": primer_constraints.tm_min,
-        "PRIMER_OPT_TM": primer_constraints.tm_opt,
-        "PRIMER_MAX_TM": primer_constraints.tm_max,
-        "PRIMER_MIN_GC": primer_constraints.gc_min,
-        "PRIMER_OPT_GC_PERCENT": primer_constraints.gc_opt,
-        "PRIMER_MAX_GC": primer_constraints.gc_max,
-        "PRIMER_MAX_SELF_ANY_TH": primer_constraints.max_self_complementarity,
-        "PRIMER_MAX_SELF_END_TH": primer_constraints.max_self_end_complementarity,
-        "PRIMER_MAX_HAIRPIN_TH": primer_constraints.max_hairpin_th,
-        "PRIMER_PAIR_MAX_DIFF_TM": pair_constraints.max_tm_diff,
-        "PRIMER_PAIR_MAX_COMPL_ANY_TH": pair_constraints.max_pair_complementarity,
-        "PRIMER_PAIR_MAX_COMPL_END_TH": pair_constraints.max_pair_end_complementarity,
-        "PRIMER_PRODUCT_SIZE_RANGE": [[
+    disabled = set(disabled_constraints or [])
+
+    global_args: dict = {}
+
+    # Primer size constraints — always include (primer3 needs a size range).
+    # When disabled: use very permissive bounds and zero out penalty weights so
+    # primer3 doesn't silently apply its own restrictive defaults (18–27 nt).
+    if "length" not in disabled:
+        global_args["PRIMER_MIN_SIZE"] = primer_constraints.length_min
+        global_args["PRIMER_OPT_SIZE"] = primer_constraints.length_opt
+        global_args["PRIMER_MAX_SIZE"] = primer_constraints.length_max
+    else:
+        global_args["PRIMER_MIN_SIZE"] = 10
+        global_args["PRIMER_OPT_SIZE"] = 20
+        global_args["PRIMER_MAX_SIZE"] = 60
+        global_args["PRIMER_WT_SIZE_LT"] = 0.0
+        global_args["PRIMER_WT_SIZE_GT"] = 0.0
+
+    # Tm constraints — when disabled: open bounds + zero weights so primer3
+    # doesn't apply its own hardcoded defaults (57–63 °C) as hard limits.
+    if "tm" not in disabled:
+        global_args["PRIMER_MIN_TM"] = primer_constraints.tm_min
+        global_args["PRIMER_OPT_TM"] = primer_constraints.tm_opt
+        global_args["PRIMER_MAX_TM"] = primer_constraints.tm_max
+    else:
+        global_args["PRIMER_MIN_TM"] = 0.0
+        global_args["PRIMER_OPT_TM"] = 60.0   # irrelevant with zero weights
+        global_args["PRIMER_MAX_TM"] = 100.0
+        global_args["PRIMER_WT_TM_LT"] = 0.0
+        global_args["PRIMER_WT_TM_GT"] = 0.0
+
+    # GC constraints
+    if "gc" not in disabled:
+        global_args["PRIMER_MIN_GC"] = primer_constraints.gc_min
+        global_args["PRIMER_OPT_GC_PERCENT"] = primer_constraints.gc_opt
+        global_args["PRIMER_MAX_GC"] = primer_constraints.gc_max
+    else:
+        global_args["PRIMER_MIN_GC"] = 0.0
+        global_args["PRIMER_OPT_GC_PERCENT"] = 50.0
+        global_args["PRIMER_MAX_GC"] = 100.0
+        global_args["PRIMER_WT_GC_PERCENT_LT"] = 0.0
+        global_args["PRIMER_WT_GC_PERCENT_GT"] = 0.0
+
+    # Self-complementarity
+    if "max_self_complementarity" not in disabled:
+        global_args["PRIMER_MAX_SELF_ANY_TH"] = primer_constraints.max_self_complementarity
+    else:
+        global_args["PRIMER_MAX_SELF_ANY_TH"] = 9999.0
+        global_args["PRIMER_WT_SELF_ANY_TH"] = 0.0
+
+    if "max_self_end_complementarity" not in disabled:
+        global_args["PRIMER_MAX_SELF_END_TH"] = primer_constraints.max_self_end_complementarity
+    else:
+        global_args["PRIMER_MAX_SELF_END_TH"] = 9999.0
+        global_args["PRIMER_WT_SELF_END_TH"] = 0.0
+
+    # Hairpin
+    if "max_hairpin_th" not in disabled:
+        global_args["PRIMER_MAX_HAIRPIN_TH"] = primer_constraints.max_hairpin_th
+    else:
+        global_args["PRIMER_MAX_HAIRPIN_TH"] = 9999.0
+        global_args["PRIMER_WT_HAIRPIN_TH"] = 0.0
+
+    # Poly-X
+    if "max_poly_x" not in disabled:
+        global_args["PRIMER_MAX_POLY_X"] = primer_constraints.max_poly_x
+    else:
+        global_args["PRIMER_MAX_POLY_X"] = 100
+
+    # Pair constraints
+    if "max_tm_diff" not in disabled:
+        global_args["PRIMER_PAIR_MAX_DIFF_TM"] = pair_constraints.max_tm_diff
+    else:
+        global_args["PRIMER_PAIR_MAX_DIFF_TM"] = 100.0
+        global_args["PRIMER_WT_DIFF_TM"] = 0.0
+
+    if "max_pair_complementarity" not in disabled:
+        global_args["PRIMER_PAIR_MAX_COMPL_ANY_TH"] = pair_constraints.max_pair_complementarity
+    else:
+        global_args["PRIMER_PAIR_MAX_COMPL_ANY_TH"] = 9999.0
+        global_args["PRIMER_WT_COMPL_ANY_TH"] = 0.0
+
+    if "max_pair_end_complementarity" not in disabled:
+        global_args["PRIMER_PAIR_MAX_COMPL_END_TH"] = pair_constraints.max_pair_end_complementarity
+    else:
+        global_args["PRIMER_PAIR_MAX_COMPL_END_TH"] = 9999.0
+        global_args["PRIMER_WT_COMPL_END_TH"] = 0.0
+
+    # Amplicon size — always include (primer3 needs a product size range)
+    if "amplicon_size" not in disabled:
+        global_args["PRIMER_PRODUCT_SIZE_RANGE"] = [[
             amplicon_constraints.size_min,
             amplicon_constraints.size_max,
-        ]],
-        "PRIMER_PRODUCT_OPT_SIZE": amplicon_constraints.size_opt,
-        "PRIMER_MAX_POLY_X": primer_constraints.max_poly_x,
-        "PRIMER_SALT_MONOVALENT": primary.na_mm + primary.k_mm,
-        "PRIMER_SALT_DIVALENT": primary.mg_mm,
-        "PRIMER_DNTP_CONC": primary.dntps_mm,
-        "PRIMER_DNA_CONC": primary.primer_nm,
-        "PRIMER_TM_FORMULA": 1,       # SantaLucia 1998
-        "PRIMER_SALT_CORRECTIONS": 1,  # SantaLucia 1998
-        "PRIMER_NUM_RETURN": num_return * overshoot_factor,
-    }
+        ]]
+        global_args["PRIMER_PRODUCT_OPT_SIZE"] = amplicon_constraints.size_opt
+    else:
+        # Even when disabled, primer3 needs some size range to work
+        global_args["PRIMER_PRODUCT_SIZE_RANGE"] = [[20, 10000]]
+
+    # Salt/concentration/formula — always set (not user-controllable)
+    global_args["PRIMER_SALT_MONOVALENT"] = primary.na_mm + primary.k_mm
+    global_args["PRIMER_SALT_DIVALENT"] = primary.mg_mm
+    global_args["PRIMER_DNTP_CONC"] = primary.dntps_mm
+    global_args["PRIMER_DNA_CONC"] = primary.primer_nm
+    global_args["PRIMER_TM_FORMULA"] = 1       # SantaLucia 1998
+    global_args["PRIMER_SALT_CORRECTIONS"] = 1  # SantaLucia 1998
+    # When diversity mode is active, force primer3 itself to return spread candidates
+    # by setting minimum 3' end distance between returned primers. This is the primary
+    # mechanism — without it, primer3 returns hundreds of near-identical pairs from
+    # the same local optimum, and post-hoc filtering has nothing diverse to work with.
+    if diversity_mode == "off":
+        num_candidates = num_return * overshoot_factor
+    elif diversity_mode == "coverage":
+        # Goal: num_return pairs evenly spread across the template,
+        # best quality within each section.
+        #
+        # Divide template into num_return sections. Ask primer3 for
+        # overshoot candidates per section so we have quality choices,
+        # with spacing = section_size / overshoot so candidates fill
+        # each section rather than all piling into the best-scoring region.
+        candidates_per_section = max(overshoot_factor * 2, 6)
+        num_candidates = num_return * candidates_per_section
+        section_size = len(template_seq) / num_return
+        spacing = max(10, int(section_size / candidates_per_section))
+        global_args["PRIMER_MIN_LEFT_THREE_PRIME_DISTANCE"] = spacing
+        global_args["PRIMER_MIN_RIGHT_THREE_PRIME_DISTANCE"] = spacing
+    else:
+        # sparse / spread — fixed spacing, generous overshoot
+        spacing = {"sparse": 10, "spread": 25}.get(diversity_mode, 10)
+        global_args["PRIMER_MIN_LEFT_THREE_PRIME_DISTANCE"] = spacing
+        global_args["PRIMER_MIN_RIGHT_THREE_PRIME_DISTANCE"] = spacing
+        num_candidates = max(num_return * overshoot_factor * 3, 60)
+    global_args["PRIMER_NUM_RETURN"] = num_candidates
 
     _progress("primer3", "Running primer3...", 10)
     p3_result = primer3.design_primers(seq_args, global_args)
@@ -198,47 +407,69 @@ def design_primers(
     filtered_by_blast = 0
     blast_warning = False
 
-    # ── BLAST screening ───────────────────────────────────────────────────────
+    # ── BLAST screening (batched + thermodynamic filtering) ────────────────────
     if specificity.enabled and specificity.genome_ids:
-        _progress("blast", f"BLAST screening {total_candidates} candidate(s)...", 55)
-        passing: list[tuple[float, PairResult]] = []
-        for blast_i, (penalty, pair) in enumerate(candidates):
-            if total_candidates > 0:
-                pct = 55 + 35 * (blast_i / total_candidates)
-                _progress("blast", f"BLAST screening pair {blast_i + 1}/{total_candidates}...", pct)
-            all_fwd_hits = []
-            all_rev_hits = []
-            for genome_id in specificity.genome_ids:
-                all_fwd_hits += screen_primer(
-                    pair.forward.sequence,
-                    genome_id,
-                    evalue=specificity.evalue_threshold,
-                    min_alignment_length=specificity.min_alignment_length,
-                )
-                all_rev_hits += screen_primer(
-                    pair.reverse.sequence,
-                    genome_id,
-                    evalue=specificity.evalue_threshold,
-                    min_alignment_length=specificity.min_alignment_length,
-                )
+        # Collect all unique primer sequences across all candidates
+        all_primer_seqs = set()
+        for _, pair in candidates:
+            all_primer_seqs.add(pair.forward.sequence)
+            all_primer_seqs.add(pair.reverse.sequence)
 
-            off_targets = check_pair_off_target_amplicons(
-                all_fwd_hits,
-                all_rev_hits,
-                max_amplicon_size=amplicon_constraints.size_max * 4,
-                expected_amplicon_size=pair.amplicon_size,
+        _progress("blast", f"BLAST screening {len(all_primer_seqs)} unique primers (batched)...", 55)
+
+        # One BLAST call per genome for ALL primers at once
+        hits_by_seq: dict[str, list] = {s: [] for s in all_primer_seqs}
+        for gi, genome_id in enumerate(specificity.genome_ids):
+            pct = 55 + 20 * (gi / max(len(specificity.genome_ids), 1))
+            _progress("blast", f"BLAST vs {genome_id}...", pct)
+            batch_hits = screen_primers_batch(
+                list(all_primer_seqs),
+                genome_id,
+                evalue=specificity.evalue_threshold,
+                min_alignment_length=specificity.min_alignment_length,
             )
+            for seq, hits in batch_hits.items():
+                hits_by_seq[seq].extend(hits)
 
-            pair.forward.blast_hits = all_fwd_hits
-            pair.reverse.blast_hits = all_rev_hits
-            pair.off_target_amplicons = off_targets
+        # Annotate all hits with Tm
+        _progress("blast", "Computing off-target Tm...", 78)
+        for seq, hits in hits_by_seq.items():
+            for hit in hits:
+                hit.hit_tm = calc_hit_tm(hit, primary)
 
-            if len(off_targets) <= specificity.max_off_targets:
+        # Evaluate each pair using pre-computed hits
+        _progress("blast", "Evaluating pair specificity...", 85)
+        tm_threshold = specificity.off_target_tm_threshold
+        max_amp = amplicon_constraints.size_max * 4
+        passing: list[tuple[float, PairResult]] = []
+
+        for penalty, pair in candidates:
+            fwd_hits = hits_by_seq.get(pair.forward.sequence, [])
+            rev_hits = hits_by_seq.get(pair.reverse.sequence, [])
+
+            pair.forward.blast_hits = fwd_hits
+            pair.reverse.blast_hits = rev_hits
+
+            viable_fwd = [h for h in fwd_hits if h.hit_tm is not None and h.hit_tm >= tm_threshold]
+            viable_rev = [h for h in rev_hits if h.hit_tm is not None and h.hit_tm >= tm_threshold]
+
+            if len(viable_fwd) <= 1 and len(viable_rev) <= 1:
                 pair.specificity_status = "pass"
+                pair.off_target_amplicons = []
                 passing.append((penalty, pair))
             else:
-                pair.specificity_status = "fail"
-                filtered_by_blast += 1
+                off_targets = check_pair_off_target_amplicons(
+                    viable_fwd, viable_rev,
+                    max_amplicon_size=max_amp,
+                    expected_amplicon_size=pair.amplicon_size,
+                )
+                pair.off_target_amplicons = off_targets
+                if len(off_targets) <= specificity.max_off_targets:
+                    pair.specificity_status = "pass"
+                    passing.append((penalty, pair))
+                else:
+                    pair.specificity_status = "fail"
+                    filtered_by_blast += 1
 
         if total_candidates > 0 and filtered_by_blast > (2 * total_candidates // 3):
             blast_warning = True
@@ -246,8 +477,11 @@ def design_primers(
         candidates = passing
 
     _progress("ranking", "Ranking results...", 95)
-    # ── Re-rank and trim ──────────────────────────────────────────────────────
+    # ── Apply diversity filter, then re-rank and trim ────────────────────────
     candidates.sort(key=lambda x: x[0])
+    candidates = _apply_diversity_filter(
+        candidates, diversity_mode, num_return, template_length=len(template_seq)
+    )
     top = candidates[:num_return]
     pairs = []
     for rank, (_, pair) in enumerate(top, start=1):

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import design, genomes, profiles, sequence, sequences
+from routers import configs, design, export, genomes, profiles, sequence, sequences
 
 # Load .env from repo root (one level above backend/)
 _ROOT = Path(__file__).parent.parent
@@ -32,11 +32,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(configs.router)
 app.include_router(design.router)
+app.include_router(export.router)
 app.include_router(profiles.router)
 app.include_router(genomes.router)
 app.include_router(sequence.router)
 app.include_router(sequences.router)
+
+
+_VERSION_FILE = _ROOT / "version.txt"
+
+def _read_version() -> str:
+    try:
+        return _VERSION_FILE.read_text().strip()
+    except Exception:
+        return "???"
 
 
 @app.get("/health")
@@ -44,3 +55,8 @@ def health():
     from core.blast_screen import blast_version
     bv = blast_version()
     return {"status": "ok", "blast_available": bv is not None, "blast_version": bv}
+
+
+@app.get("/api/version")
+def version():
+    return {"version": _read_version()}

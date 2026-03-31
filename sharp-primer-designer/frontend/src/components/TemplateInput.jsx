@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { fetchSequence } from '../api/client'
+import SequenceBar from './SequenceBar'
 
 const TABS = ['paste', 'upload', 'accession']
 const TAB_LABELS = { paste: 'Paste Sequence', upload: 'Upload FASTA', accession: 'NCBI Accession' }
@@ -54,19 +55,24 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
       name: seqName.trim(),
       sequence: value.sequence,
       target_start: value.target_start || null,
-      target_length: value.target_length || null,
+      target_end: value.target_end || null,
     })
     setSeqName('')
   }
 
   function handleLoad(seq) {
+    // Convert legacy target_length to target_end if needed
+    let targetEnd = seq.target_end || null
+    if (!targetEnd && seq.target_start && seq.target_length) {
+      targetEnd = seq.target_start + seq.target_length - 1
+    }
     onChange({
       ...value,
       sequence: seq.sequence,
       fasta_file: null,
       accession: null,
       target_start: seq.target_start || null,
-      target_length: seq.target_length || null,
+      target_end: targetEnd,
     })
     setTab('paste')
   }
@@ -179,32 +185,61 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
       )}
 
       {/* Target region */}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-muted-foreground">Target start (1-indexed)</label>
-          <input
-            type="number"
-            className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="optional"
-            value={value.target_start || ''}
-            onChange={(e) =>
-              onChange({ ...value, target_start: e.target.value ? parseInt(e.target.value) : null })
-            }
+      {hasSequence && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground">Target Region</label>
+            {(value.target_start || value.target_end) && (
+              <button
+                onClick={() => onChange({ ...value, target_start: null, target_end: null })}
+                className="text-[10px] text-muted-foreground hover:text-destructive"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <SequenceBar
+            sequenceLength={value.sequence.length}
+            targetStart={value.target_start}
+            targetEnd={value.target_end}
+            onChange={(start, end) => onChange({ ...value, target_start: start, target_end: end })}
           />
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-muted-foreground">Start</label>
+              <input
+                type="number"
+                min={1}
+                max={value.sequence.length}
+                className="w-full border rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="1"
+                value={value.target_start || ''}
+                onChange={(e) => {
+                  const v = e.target.value ? parseInt(e.target.value) : null
+                  onChange({ ...value, target_start: v })
+                }}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">End</label>
+              <input
+                type="number"
+                min={1}
+                max={value.sequence.length}
+                className="w-full border rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder={value.sequence.length.toString()}
+                value={value.target_end || ''}
+                onChange={(e) => {
+                  const v = e.target.value ? parseInt(e.target.value) : null
+                  onChange({ ...value, target_end: v })
+                }}
+              />
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Target length (bp)</label>
-          <input
-            type="number"
-            className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="optional"
-            value={value.target_length || ''}
-            onChange={(e) =>
-              onChange({ ...value, target_length: e.target.value ? parseInt(e.target.value) : null })
-            }
-          />
-        </div>
-      </div>
+      )}
 
       {/* Saved sequences */}
       <div className="space-y-1.5">
