@@ -14,7 +14,7 @@ function extractApiError(err, fallback) {
   if (Array.isArray(d)) return d.map((e) => e.msg).join('; ')
   return d || fallback
 }
-import { getProfiles, getGenomes, getSequences, saveSequence, deleteSequence } from './api/client'
+import { getProfiles, getGenomes, getSequences, saveSequence, deleteSequence, getConfigs, saveConfigApi, updateConfigApi, deleteConfigApi } from './api/client'
 import {
   DEFAULT_PRIMER_CONSTRAINTS,
   DEFAULT_PAIR_CONSTRAINTS,
@@ -146,6 +146,9 @@ export default function App() {
   // Saved sequences
   const [savedSequences, setSavedSequences] = useState([])
 
+  // Saved configs (parameter presets)
+  const [savedConfigs, setSavedConfigs] = useState([])
+
   // Settings modal & help
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -171,6 +174,7 @@ export default function App() {
       if (lambdaPresent) setSelectedGenomeIds(['lambda'])
     }).catch(console.error)
     loadSavedSequences()
+    loadSavedConfigs()
 
     // Restore previous session (results + template)
     const session = loadSession()
@@ -194,6 +198,64 @@ export default function App() {
   async function handleDeleteSequence(id) {
     await deleteSequence(id)
     loadSavedSequences()
+  }
+
+  // ── Saved configs ────────────────────────────────────────────────────────
+  function loadSavedConfigs() {
+    getConfigs().then((r) => setSavedConfigs(r.configs)).catch(console.error)
+  }
+
+  async function handleSaveConfig(name) {
+    await saveConfigApi({
+      id: '',
+      name,
+      primer_constraints: primerConstraints,
+      pair_constraints: pairConstraints,
+      amplicon_constraints: ampliconConstraints,
+      enabled_constraints: enabledConstraints,
+      num_pairs: numPairs,
+      diversity_mode: diversityMode,
+      reaction_conditions: reactionConditions,
+      blast_enabled: blastEnabled,
+      selected_genome_ids: selectedGenomeIds,
+      off_target_tm_threshold: offTargetTmThreshold,
+    })
+    loadSavedConfigs()
+  }
+
+  async function handleUpdateConfig(config) {
+    await updateConfigApi(config.id, {
+      ...config,
+      primer_constraints: primerConstraints,
+      pair_constraints: pairConstraints,
+      amplicon_constraints: ampliconConstraints,
+      enabled_constraints: enabledConstraints,
+      num_pairs: numPairs,
+      diversity_mode: diversityMode,
+      reaction_conditions: reactionConditions,
+      blast_enabled: blastEnabled,
+      selected_genome_ids: selectedGenomeIds,
+      off_target_tm_threshold: offTargetTmThreshold,
+    })
+    loadSavedConfigs()
+  }
+
+  function handleLoadConfig(config) {
+    setPrimerConstraints(config.primer_constraints)
+    setPairConstraints(config.pair_constraints)
+    setAmpliconConstraints(config.amplicon_constraints)
+    setEnabledConstraints(config.enabled_constraints)
+    setNumPairs(config.num_pairs)
+    setDiversityMode(config.diversity_mode)
+    setReactionConditions(config.reaction_conditions)
+    setBlastEnabled(config.blast_enabled)
+    setSelectedGenomeIds(config.selected_genome_ids)
+    setOffTargetTmThreshold(config.off_target_tm_threshold)
+  }
+
+  async function handleDeleteConfig(id) {
+    await deleteConfigApi(id)
+    loadSavedConfigs()
   }
 
   const primaryProfile = profiles.find((p) => p.id === reactionConditions.primary_profile_id)
@@ -453,6 +515,11 @@ export default function App() {
             onNumPairsChange={setNumPairs}
             diversityMode={diversityMode}
             onDiversityModeChange={setDiversityMode}
+            savedConfigs={savedConfigs}
+            onSaveConfig={handleSaveConfig}
+            onUpdateConfig={handleUpdateConfig}
+            onLoadConfig={handleLoadConfig}
+            onDeleteConfig={handleDeleteConfig}
           />
 
           <hr />

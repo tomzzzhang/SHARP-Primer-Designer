@@ -232,6 +232,27 @@ class AddGenomeRequest(BaseModel):
         return v
 
 
+# ─── Design configs (saved parameter presets) ────────────────────────────────
+
+class DesignConfig(BaseModel):
+    id: str = ""
+    name: str
+    primer_constraints: PrimerConstraints = PrimerConstraints()
+    pair_constraints: PairConstraints = PairConstraints()
+    amplicon_constraints: AmpliconConstraints = AmpliconConstraints()
+    enabled_constraints: dict[str, bool] = {}
+    num_pairs: int = 10
+    diversity_mode: str = "off"
+    reaction_conditions: ReactionConditions = ReactionConditions()
+    blast_enabled: bool = True
+    selected_genome_ids: list[str] = ["lambda"]
+    off_target_tm_threshold: float = 45.0
+
+
+class DesignConfigsResponse(BaseModel):
+    configs: list[DesignConfig]
+
+
 # ─── Saved sequences ─────────────────────────────────────────────────────────
 
 class SavedSequence(BaseModel):

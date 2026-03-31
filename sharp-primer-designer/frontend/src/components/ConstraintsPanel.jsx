@@ -152,9 +152,99 @@ export default function ConstraintsPanel({
   onNumPairsChange,
   diversityMode,
   onDiversityModeChange,
+  savedConfigs = [],
+  onSaveConfig,
+  onUpdateConfig,
+  onLoadConfig,
+  onDeleteConfig,
 }) {
+  const [configName, setConfigName] = useState('')
+  const [configError, setConfigError] = useState('')
+
+  async function handleSave() {
+    const name = configName.trim()
+    if (!name) return
+    try {
+      setConfigError('')
+      await onSaveConfig(name)
+      setConfigName('')
+    } catch (err) {
+      setConfigError(err.message)
+    }
+  }
+
+  async function handleOverwrite(config) {
+    try {
+      setConfigError('')
+      await onUpdateConfig(config)
+    } catch (err) {
+      setConfigError(err.message)
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {/* Saved configs */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Saved Configs
+        </h3>
+        <div className="space-y-1.5">
+          <div className="flex gap-1">
+            <input
+              type="text"
+              placeholder="Config name..."
+              className="flex-1 border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              value={configName}
+              onChange={(e) => setConfigName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            />
+            <button
+              onClick={handleSave}
+              disabled={!configName.trim()}
+              className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
+          </div>
+          {configError && <p className="text-xs text-destructive">{configError}</p>}
+          {savedConfigs.length > 0 ? (
+            <div className="border rounded max-h-28 overflow-y-auto divide-y">
+              {savedConfigs.map((cfg) => (
+                <div
+                  key={cfg.id}
+                  className="flex items-center gap-1 px-2 py-1.5 hover:bg-muted/50 cursor-pointer group"
+                  onClick={() => onLoadConfig(cfg)}
+                  title="Click to load this config"
+                >
+                  <span className="text-xs truncate flex-1">{cfg.name}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleOverwrite(cfg) }}
+                    className="text-[10px] text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 shrink-0"
+                    title="Overwrite with current settings"
+                  >
+                    Update
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteConfig(cfg.id) }}
+                    className="text-xs text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 shrink-0"
+                    title="Delete config"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              No saved configs. Set your parameters and save a preset above.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <hr />
+
       {/* Primer constraints */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">

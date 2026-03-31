@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import design, export, genomes, profiles, sequence, sequences
+from routers import configs, design, export, genomes, profiles, sequence, sequences
 
 # Load .env from repo root (one level above backend/)
 _ROOT = Path(__file__).parent.parent
@@ -32,6 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(configs.router)
 app.include_router(design.router)
 app.include_router(export.router)
 app.include_router(profiles.router)
