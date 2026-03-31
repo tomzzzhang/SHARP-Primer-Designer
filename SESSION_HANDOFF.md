@@ -1,10 +1,27 @@
 # SHARP Primer Designer — Session Handoff
 **Branch:** `feature/v1-workflow`
 **Repo:** `tomzzzhang/SHARP-Primer-Designer`
-**Version key:** K42
-**Last updated:** 2026-03-31 (K43)
+**Version key:** K43
+**Last updated:** 2026-03-31 18:00 PST
 
 Read `PRIMER_DESIGNER_CONTEXT.md` for product/company context. This document is the coding session handoff — what was built, how it works, every design decision, and current state.
+
+## Current State (as of 2026-03-31)
+
+**K43 is complete and validated.** The tool is fully functional for v1 primer design workflow:
+- Designed 20 primer pairs from lambda phage with MicroMole 33 settings (33nt, GC 47-57%, structural filters, Tm disabled, coverage diversity mode)
+- All penalty scores 0 -- expected behavior given Tm disabled and all primers hitting 33nt opt exactly (see design notes below)
+- Export (zip: IDT .xlsx + Notion JSON + markdown summary) confirmed working
+- openpyxl is installed in the `sharp` conda env (was missing; fixed this session)
+- MicroMole 33 config preset saved to `data/configs.json` and committed
+
+**PR open:** `feature/v1-workflow` -> `main`. Merge when ready to ship v1.
+
+**Next session focus:** Experimental testing of designed primers. When results come back, the next development priority is outcome tracking (annotate pairs with amplification yes/no, strength) so the tool can start building empirical data toward a SHARP-specific performance index.
+
+---
+
+**Key conceptual note for next session:** SHARP has no equivalent to PCR's Tm as a dimensionally-reduced performance index. Tm predicts PCR because thermocycling is governed by melting kinetics. SHARP uses helicase-based (PcrA-M6) unwinding -- Tm does not predict performance. The structural thresholds (hairpin Tm, self-comp Tm) are still meaningful as "will this structure form at 65C?" filters. The off-target BLAST Tm is still meaningful as "will this primer bind here at 65C?". But there is no known scalar that predicts SHARP amplification efficiency. The tool is in data-collection mode. Every pair designed and tested is a data point toward discovering that index.
 
 ---
 
@@ -318,9 +335,6 @@ Lambda phage (~49.9% GC overall) has uneven GC distribution. A tight GC constrai
 
 ### BLAST slow on first run
 The first BLAST call per genome cold-starts the database. Subsequent calls are faster. For Lambda (~48kb), batched BLAST is fast (1–3s). Larger genomes will take longer.
-
-### Import/export requires openpyxl
-Must be installed in the conda env: `pip install openpyxl`. It's in `requirements.txt` and `setup.sh` for fresh installs but must be added manually to existing envs.
 
 ### Session persistence and imported results
 `resultsSource` tracks whether results came from design ("designed") or import ("imported"). Imported results show an amber "Imported" badge in the header area. The session save/load respects this.
