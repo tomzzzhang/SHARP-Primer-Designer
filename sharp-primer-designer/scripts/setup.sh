@@ -52,6 +52,7 @@ if command -v conda &>/dev/null; then
         python-multipart \
         python-dotenv \
         pydantic \
+        openpyxl \
         pytest \
         httpx \
         pip

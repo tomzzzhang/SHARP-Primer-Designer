@@ -31,12 +31,35 @@ export const DEFAULT_AMPLICON_CONSTRAINTS = {
   size_max: 500,
 }
 
+/**
+ * Which constraint parameters are enabled by default.
+ * Key = parameter field name, value = boolean.
+ * Disabled parameters are not sent to primer3 (unconstrained).
+ */
+export const DEFAULT_ENABLED_CONSTRAINTS = {
+  // Primer constraints
+  length: true,
+  tm: true,
+  gc: true,
+  max_poly_x: true,
+  max_self_complementarity: true,
+  max_self_end_complementarity: true,
+  max_hairpin_th: true,
+  // Pair constraints
+  max_tm_diff: true,
+  max_pair_complementarity: true,
+  max_pair_end_complementarity: true,
+  // Amplicon constraints
+  amplicon_size: true,
+}
+
 export const DEFAULT_SPECIFICITY = {
   genome_ids: ['lambda'],
   enabled: true,
   evalue_threshold: 1000,
   min_alignment_length: 15,
   max_off_targets: 0,
+  off_target_tm_threshold: 45.0,  // °C — BLAST hits below this Tm are ignored
 }
 
 export const DEFAULT_REACTION_CONDITIONS = {

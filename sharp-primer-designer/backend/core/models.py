@@ -74,6 +74,7 @@ class SpecificityConfig(BaseModel):
     evalue_threshold: float = 1000
     min_alignment_length: int = 15
     max_off_targets: int = 0
+    off_target_tm_threshold: float = 45.0  # Minimum Tm (°C) for a BLAST hit to count as viable binding
 
 
 # ─── Template input ────────────────────────────────────────────────────────────
@@ -106,6 +107,9 @@ class BlastHit(BaseModel):
     query_start: int
     query_end: int
     strand: str  # "plus" or "minus"
+    qseq: str = ""         # aligned query (primer) subsequence
+    sseq: str = ""         # aligned subject (genome) subsequence
+    hit_tm: Optional[float] = None  # Tm of primer-hit duplex under reaction conditions
 
 
 class OffTargetAmplicon(BaseModel):
@@ -164,9 +168,11 @@ class DesignRequest(BaseModel):
     primer_constraints: PrimerConstraints = PrimerConstraints()
     pair_constraints: PairConstraints = PairConstraints()
     amplicon_constraints: AmpliconConstraints = AmpliconConstraints()
+    disabled_constraints: list[str] = []  # constraint keys to skip (e.g. ["tm", "gc", "max_poly_x"])
     reaction_conditions: ReactionConditions = ReactionConditions()
     specificity: SpecificityConfig = SpecificityConfig()
     num_pairs: int = 10
+    diversity_mode: str = "off"  # "off", "sparse", "spread", "coverage"
 
 
 class TemplateInfo(BaseModel):

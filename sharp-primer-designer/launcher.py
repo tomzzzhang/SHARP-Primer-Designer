@@ -22,7 +22,15 @@ ENV_TYPE_FILE = ROOT / ".python_env_type"
 BACKEND_DIR   = ROOT / "backend"
 FRONTEND_DIR  = ROOT / "frontend"
 APP_URL        = "http://localhost:5173"
-BACKEND_URL    = "http://localhost:8000/health"
+BACKEND_URL    = "http://127.0.0.1:8000/health"
+
+def _read_version() -> str:
+    try:
+        return (ROOT / "version.txt").read_text().strip()
+    except Exception:
+        return "???"
+
+BUILD_VERSION = _read_version()
 
 # ── Platform helpers ──────────────────────────────────────────────────────────
 
@@ -121,7 +129,12 @@ class LauncherApp:
         tk.Label(
             root, text="Primer design for SHARP isothermal amplification",
             font=("Helvetica", 10), bg="#f9fafb", fg="#6b7280"
-        ).pack(pady=(0, 16))
+        ).pack(pady=(0, 4))
+        # Version key — large and prominent so user can confirm correct build
+        tk.Label(
+            root, text=f"Version  {BUILD_VERSION}",
+            font=(_mono_font(), 20, "bold"), bg="#f9fafb", fg="#2563eb"
+        ).pack(pady=(0, 14))
 
         # Status indicators
         frame = tk.Frame(root, bg="#f9fafb")
@@ -286,7 +299,8 @@ class LauncherApp:
 
             if not backend_ok:
                 try:
-                    urllib.request.urlopen(BACKEND_URL, timeout=1)
+                    resp = urllib.request.urlopen(BACKEND_URL, timeout=2)
+                    resp.read()
                     backend_ok = True
                     self.root.after(0, lambda: self.backend_dot.config(fg="#16a34a"))
                     self._log("Backend ready ✓")

@@ -72,13 +72,29 @@ function HelpDot({ tip }) {
   )
 }
 
+// ─── Enable checkbox ────────────────────────────────────────────────────────
+
+function EnableCheckbox({ constraintKey, enabled, onChange }) {
+  return (
+    <input
+      type="checkbox"
+      checked={enabled[constraintKey] !== false}
+      onChange={(e) => onChange({ ...enabled, [constraintKey]: e.target.checked })}
+      className="w-3 h-3 shrink-0 accent-primary cursor-pointer"
+      title={enabled[constraintKey] !== false ? 'Constraint active - uncheck to disable' : 'Constraint disabled - primer3 will not filter on this'}
+    />
+  )
+}
+
 // ─── Field components ────────────────────────────────────────────────────────
 
-function MinOptMax({ label, minKey, optKey, maxKey, values, onChange, step = 1, unit = '', tip }) {
+function MinOptMax({ label, minKey, optKey, maxKey, values, onChange, step = 1, unit = '', tip, constraintKey, enabled, onEnabledChange }) {
+  const isEnabled = enabled[constraintKey] !== false
   return (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground flex items-center">
-        <span>{label}{unit ? ` (${unit})` : ''}</span>
+    <div className={`space-y-1 ${!isEnabled ? 'opacity-40' : ''}`}>
+      <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <EnableCheckbox constraintKey={constraintKey} enabled={enabled} onChange={onEnabledChange} />
+        <span className={!isEnabled ? 'line-through' : ''}>{label}{unit ? ` (${unit})` : ''}</span>
         {tip && <HelpDot tip={tip} />}
       </label>
       <div className="grid grid-cols-3 gap-1">
@@ -88,7 +104,8 @@ function MinOptMax({ label, minKey, optKey, maxKey, values, onChange, step = 1, 
             <input
               type="number"
               step={step}
-              className="w-full border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring"
+              disabled={!isEnabled}
+              className="w-full border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
               value={values[key]}
               onChange={(e) => onChange({ ...values, [key]: parseFloat(e.target.value) || 0 })}
             />
@@ -99,17 +116,20 @@ function MinOptMax({ label, minKey, optKey, maxKey, values, onChange, step = 1, 
   )
 }
 
-function SingleField({ label, fieldKey, values, onChange, step = 0.1, unit = '', tip }) {
+function SingleField({ label, fieldKey, values, onChange, step = 0.1, unit = '', tip, constraintKey, enabled, onEnabledChange }) {
+  const isEnabled = enabled[constraintKey] !== false
   return (
-    <div className="flex items-center justify-between gap-2">
-      <label className="text-xs text-muted-foreground flex-1 flex items-center">
-        <span className="whitespace-nowrap">{label}{unit ? ` (${unit})` : ''}</span>
+    <div className={`flex items-center justify-between gap-2 ${!isEnabled ? 'opacity-40' : ''}`}>
+      <label className="text-xs text-muted-foreground flex-1 flex items-center gap-1.5">
+        <EnableCheckbox constraintKey={constraintKey} enabled={enabled} onChange={onEnabledChange} />
+        <span className={`whitespace-nowrap ${!isEnabled ? 'line-through' : ''}`}>{label}{unit ? ` (${unit})` : ''}</span>
         {tip && <HelpDot tip={tip} />}
       </label>
       <input
         type="number"
         step={step}
-        className="w-20 border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring"
+        disabled={!isEnabled}
+        className="w-20 border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
         value={values[fieldKey]}
         onChange={(e) => onChange({ ...values, [fieldKey]: parseFloat(e.target.value) || 0 })}
       />
@@ -126,8 +146,12 @@ export default function ConstraintsPanel({
   onPairConstraintsChange,
   ampliconConstraints,
   onAmpliconConstraintsChange,
+  enabledConstraints,
+  onEnabledConstraintsChange,
   numPairs,
   onNumPairsChange,
+  diversityMode,
+  onDiversityModeChange,
 }) {
   return (
     <div className="space-y-4">
@@ -142,6 +166,7 @@ export default function ConstraintsPanel({
             minKey="length_min" optKey="length_opt" maxKey="length_max"
             values={primerConstraints} onChange={onPrimerConstraintsChange}
             tip={TIPS.length}
+            constraintKey="length" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
           />
           <MinOptMax
             label="Tm" unit={"°C"}
@@ -149,6 +174,7 @@ export default function ConstraintsPanel({
             values={primerConstraints} onChange={onPrimerConstraintsChange}
             step={0.5}
             tip={TIPS.tm}
+            constraintKey="tm" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
           />
           <MinOptMax
             label="GC" unit="%"
@@ -156,11 +182,20 @@ export default function ConstraintsPanel({
             values={primerConstraints} onChange={onPrimerConstraintsChange}
             step={1}
             tip={TIPS.gc}
+            constraintKey="gc" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
           />
-          <SingleField label="Max poly-X" fieldKey="max_poly_x" values={primerConstraints} onChange={onPrimerConstraintsChange} step={1} tip={TIPS.max_poly_x} />
-          <SingleField label="Max self-comp (Th °C)" fieldKey="max_self_complementarity" values={primerConstraints} onChange={onPrimerConstraintsChange} tip={TIPS.max_self_complementarity} />
-          <SingleField label="Max 3' self-comp (Th °C)" fieldKey="max_self_end_complementarity" values={primerConstraints} onChange={onPrimerConstraintsChange} tip={TIPS.max_self_end_complementarity} />
-          <SingleField label="Max hairpin Tm (°C)" fieldKey="max_hairpin_th" values={primerConstraints} onChange={onPrimerConstraintsChange} tip={TIPS.max_hairpin_th} />
+          <SingleField label="Max poly-X" fieldKey="max_poly_x" values={primerConstraints} onChange={onPrimerConstraintsChange} step={1} tip={TIPS.max_poly_x}
+            constraintKey="max_poly_x" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
+          <SingleField label="Max self-comp (Th °C)" fieldKey="max_self_complementarity" values={primerConstraints} onChange={onPrimerConstraintsChange} tip={TIPS.max_self_complementarity}
+            constraintKey="max_self_complementarity" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
+          <SingleField label="Max 3' self-comp (Th °C)" fieldKey="max_self_end_complementarity" values={primerConstraints} onChange={onPrimerConstraintsChange} tip={TIPS.max_self_end_complementarity}
+            constraintKey="max_self_end_complementarity" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
+          <SingleField label="Max hairpin Tm (°C)" fieldKey="max_hairpin_th" values={primerConstraints} onChange={onPrimerConstraintsChange} tip={TIPS.max_hairpin_th}
+            constraintKey="max_hairpin_th" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
         </div>
       </div>
 
@@ -170,9 +205,15 @@ export default function ConstraintsPanel({
           Pair Constraints
         </h3>
         <div className="space-y-2">
-          <SingleField label="Max ΔTm (°C)" fieldKey="max_tm_diff" values={pairConstraints} onChange={onPairConstraintsChange} tip={TIPS.max_tm_diff} />
-          <SingleField label="Max pair comp (Th °C)" fieldKey="max_pair_complementarity" values={pairConstraints} onChange={onPairConstraintsChange} tip={TIPS.max_pair_complementarity} />
-          <SingleField label="Max pair 3' comp (Th °C)" fieldKey="max_pair_end_complementarity" values={pairConstraints} onChange={onPairConstraintsChange} tip={TIPS.max_pair_end_complementarity} />
+          <SingleField label="Max delta-Tm (°C)" fieldKey="max_tm_diff" values={pairConstraints} onChange={onPairConstraintsChange} tip={TIPS.max_tm_diff}
+            constraintKey="max_tm_diff" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
+          <SingleField label="Max pair comp (Th °C)" fieldKey="max_pair_complementarity" values={pairConstraints} onChange={onPairConstraintsChange} tip={TIPS.max_pair_complementarity}
+            constraintKey="max_pair_complementarity" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
+          <SingleField label="Max pair 3' comp (Th °C)" fieldKey="max_pair_end_complementarity" values={pairConstraints} onChange={onPairConstraintsChange} tip={TIPS.max_pair_end_complementarity}
+            constraintKey="max_pair_end_complementarity" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
+          />
         </div>
       </div>
 
@@ -187,6 +228,7 @@ export default function ConstraintsPanel({
           values={ampliconConstraints} onChange={onAmpliconConstraintsChange}
           step={10}
           tip={TIPS.amplicon_size}
+          constraintKey="amplicon_size" enabled={enabledConstraints} onEnabledChange={onEnabledConstraintsChange}
         />
       </div>
 
@@ -204,6 +246,24 @@ export default function ConstraintsPanel({
           {[5, 10, 20, 30].map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
+        </select>
+      </div>
+
+      {/* Position diversity */}
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-muted-foreground">
+          Position diversity
+          <HelpDot tip="Controls how spread out primer positions are across the template. 'Off' returns the best-scoring pairs (may cluster). Higher settings enforce spacing between primer start sites to cover more regions." />
+        </label>
+        <select
+          className="border rounded px-2 py-1 text-xs focus:outline-none"
+          value={diversityMode}
+          onChange={(e) => onDiversityModeChange(e.target.value)}
+        >
+          <option value="off">Off (best score)</option>
+          <option value="sparse">Sparse (10 bp spacing)</option>
+          <option value="spread">Spread (25 bp spacing)</option>
+          <option value="coverage">Coverage (region bins)</option>
         </select>
       </div>
     </div>

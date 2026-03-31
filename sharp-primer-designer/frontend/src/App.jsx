@@ -15,6 +15,7 @@ import {
   DEFAULT_AMPLICON_CONSTRAINTS,
   DEFAULT_SPECIFICITY,
   DEFAULT_REACTION_CONDITIONS,
+  DEFAULT_ENABLED_CONSTRAINTS,
 } from './lib/defaults'
 
 // ─── Settings modal ────────────────────────────────────────────────────────────
@@ -78,13 +79,32 @@ function SettingsModal({ open, onClose, profiles, onProfilesChange, genomes, sel
   )
 }
 
+// ─── Session persistence ──────────────────────────────────────────────────────
+
+const SESSION_KEY = 'sharp_primer_session'
+
+function saveSession(data) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(data))
+  } catch (e) { /* localStorage full or unavailable */ }
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) {
+    return null
+  }
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
   // Template
   const [template, setTemplate] = useState({
     sequence: null, fasta_file: null, accession: null,
-    target_start: null, target_length: null, excluded_regions: null,
+    target_start: null, target_end: null, excluded_regions: null,
   })
 
   // Constraints
@@ -92,6 +112,8 @@ export default function App() {
   const [pairConstraints, setPairConstraints] = useState(DEFAULT_PAIR_CONSTRAINTS)
   const [ampliconConstraints, setAmpliconConstraints] = useState(DEFAULT_AMPLICON_CONSTRAINTS)
   const [numPairs, setNumPairs] = useState(10)
+  const [enabledConstraints, setEnabledConstraints] = useState(DEFAULT_ENABLED_CONSTRAINTS)
+  const [diversityMode, setDiversityMode] = useState('off')
 
   // Profiles and conditions
   const [profiles, setProfiles] = useState([])
@@ -102,6 +124,7 @@ export default function App() {
   const [selectedGenomeIds, setSelectedGenomeIds] = useState(['lambda'])
   const [blastEnabled, setBlastEnabled] = useState(true)
   const [blastAvailable, setBlastAvailable] = useState(true)
+  const [offTargetTmThreshold, setOffTargetTmThreshold] = useState(DEFAULT_SPECIFICITY.off_target_tm_threshold)
 
   // Results
   const [results, setResults] = useState(null)
@@ -109,6 +132,10 @@ export default function App() {
   const [designing, setDesigning] = useState(false)
   const [designError, setDesignError] = useState('')
   const [progress, setProgress] = useState(null)  // {step, message, pct}
+  const [checkedRanks, setCheckedRanks] = useState(new Set())
+  const [exportName, setExportName] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [resultsSource, setResultsSource] = useState(null) // null = designed, "imported" = imported
 
   // Saved sequences
   const [savedSequences, setSavedSequences] = useState([])
@@ -118,8 +145,12 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [lastMetadata, setLastMetadata] = useState(null)
 
-  // Load profiles, genomes, saved sequences, and check BLAST on mount
+  // Version key (fetched from backend, single source of truth)
+  const [buildVersion, setBuildVersion] = useState('...')
+
+  // Load profiles, genomes, saved sequences, check BLAST, and restore session on mount
   useEffect(() => {
+    fetch('/api/version').then(r => r.json()).then(d => setBuildVersion(d.version)).catch(() => setBuildVersion('???'))
     fetch('http://localhost:8000/health').then(r => r.json()).then((data) => {
       if (!data.blast_available) {
         setBlastAvailable(false)
@@ -134,6 +165,15 @@ export default function App() {
       if (lambdaPresent) setSelectedGenomeIds(['lambda'])
     }).catch(console.error)
     loadSavedSequences()
+
+    // Restore previous session (results + template)
+    const session = loadSession()
+    if (session?.results) {
+      setResults(session.results)
+      setLastMetadata(session.results.design_metadata || null)
+      if (session.resultsSource) setResultsSource(session.resultsSource)
+      if (session.template) setTemplate(session.template)
+    }
   }, [])
 
   function loadSavedSequences() {
@@ -158,21 +198,31 @@ export default function App() {
     setDesigning(true)
     setResults(null)
     setSelectedPair(null)
+    setCheckedRanks(new Set())
+    setResultsSource(null)
     setProgress({ step: 'template', message: 'Preparing request...', pct: 2 })
 
     const templatePayload = {}
     if (template.sequence) templatePayload.sequence = template.sequence
     else if (template.fasta_file) templatePayload.fasta_file = template.fasta_file
     else if (template.accession) templatePayload.accession = template.accession
-    if (template.target_start) templatePayload.target_start = template.target_start
-    if (template.target_length) templatePayload.target_length = template.target_length
+    if (template.target_start && template.target_end) {
+      templatePayload.target_start = template.target_start
+      templatePayload.target_length = template.target_end - template.target_start + 1
+    }
     if (template.excluded_regions) templatePayload.excluded_regions = template.excluded_regions
+
+    // Collect disabled constraint keys
+    const disabledConstraints = Object.entries(enabledConstraints)
+      .filter(([, v]) => v === false)
+      .map(([k]) => k)
 
     const payload = {
       template: templatePayload,
       primer_constraints: primerConstraints,
       pair_constraints: pairConstraints,
       amplicon_constraints: ampliconConstraints,
+      disabled_constraints: disabledConstraints,
       reaction_conditions: reactionConditions,
       specificity: {
         genome_ids: blastEnabled ? selectedGenomeIds : [],
@@ -180,8 +230,10 @@ export default function App() {
         evalue_threshold: 1000,
         min_alignment_length: 15,
         max_off_targets: 0,
+        off_target_tm_threshold: offTargetTmThreshold,
       },
       num_pairs: numPairs,
+      diversity_mode: diversityMode,
     }
 
     try {
@@ -235,7 +287,17 @@ export default function App() {
               setProgress({ step: 'ranking', message: 'Done!', pct: 100 })
               setResults(data)
               setLastMetadata(data.design_metadata)
+              saveSession({ results: data, template, resultsSource: null })
               setTimeout(() => setProgress(null), 800)
+              // Warn if 0 results with target region
+              if (data.pairs?.length === 0 && template.target_start && template.target_end) {
+                setDesignError(
+                  'No primer pairs found for this target region. Try:\n' +
+                  '• Expanding the target region (drag handles wider)\n' +
+                  '• Increasing the amplicon size range\n' +
+                  '• Disabling some constraints (uncheck parameters)'
+                )
+              }
             } else if (eventType === 'error') {
               throw new Error(data.message)
             }
@@ -252,6 +314,76 @@ export default function App() {
     }
   }
 
+  async function handleExport() {
+    if (!results || checkedRanks.size === 0) return
+    setExporting(true)
+    try {
+      const selectedPairs = results.pairs.filter((p) => checkedRanks.has(p.rank))
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pairs: selectedPairs,
+          template_info: results.template_info,
+          design_metadata: results.design_metadata,
+          target_name: exportName.trim() || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || res.statusText)
+      }
+      // Download the zip file
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      a.href = url
+      a.download = `SHARP_primer_export_${dateStr}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setDesignError(`Export failed: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleImport() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const record = JSON.parse(text)
+        const res = await fetch('/api/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.detail || res.statusText)
+        }
+        const data = await res.json()
+        setResults(data)
+        setResultsSource('imported')
+        saveSession({ results: data, template, resultsSource: 'imported' })
+        setSelectedPair(null)
+        setCheckedRanks(new Set())
+        setDesignError('')
+      } catch (err) {
+        setDesignError(`Import failed: ${err.message}`)
+      }
+    }
+    input.click()
+  }
+
   const canDesign = template.sequence || template.fasta_file || template.accession
 
   return (
@@ -259,12 +391,22 @@ export default function App() {
       {/* Header */}
       <header className="border-b px-4 py-2.5 flex items-center justify-between bg-white shadow-sm">
         <div>
-          <h1 className="font-bold text-lg">SHARP Primer Designer</h1>
+          <h1 className="font-bold text-lg">
+            SHARP Primer Designer
+            <span className="ml-2 text-[10px] font-mono text-muted-foreground align-middle">{buildVersion}</span>
+          </h1>
           <p className="text-xs text-muted-foreground">
             Tm estimates are reference only — not a predictor of SHARP isothermal performance
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleImport}
+            className="px-3 py-1.5 text-sm border rounded hover:bg-muted transition-colors"
+            title="Import a previously exported primer record (.json)"
+          >
+            Import
+          </button>
           <button
             onClick={() => setHelpOpen(true)}
             className="px-3 py-1.5 text-sm border rounded hover:bg-muted transition-colors"
@@ -299,8 +441,12 @@ export default function App() {
             onPairConstraintsChange={setPairConstraints}
             ampliconConstraints={ampliconConstraints}
             onAmpliconConstraintsChange={setAmpliconConstraints}
+            enabledConstraints={enabledConstraints}
+            onEnabledConstraintsChange={setEnabledConstraints}
             numPairs={numPairs}
             onNumPairsChange={setNumPairs}
+            diversityMode={diversityMode}
+            onDiversityModeChange={setDiversityMode}
           />
 
           <hr />
@@ -378,13 +524,34 @@ export default function App() {
               </p>
             )}
             {blastAvailable && blastEnabled && (
-              <GenomeManager
-                genomes={genomes}
-                selectedIds={selectedGenomeIds}
-                onSelectionChange={setSelectedGenomeIds}
-                onGenomesChange={setGenomes}
-                showCheckboxes
-              />
+              <>
+                <GenomeManager
+                  genomes={genomes}
+                  selectedIds={selectedGenomeIds}
+                  onSelectionChange={setSelectedGenomeIds}
+                  onGenomesChange={setGenomes}
+                  showCheckboxes
+                />
+                <div className="mt-2 space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center justify-between">
+                    <span>Off-target Tm threshold</span>
+                    <span className="font-mono font-medium text-foreground">{offTargetTmThreshold}°C</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={25}
+                    max={70}
+                    step={1}
+                    value={offTargetTmThreshold}
+                    onChange={(e) => setOffTargetTmThreshold(parseFloat(e.target.value))}
+                    className="w-full h-1.5 accent-primary cursor-pointer"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    BLAST hits with binding Tm below this are ignored.
+                    Lower = stricter (catches weaker binding). Higher = more permissive.
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
@@ -400,7 +567,7 @@ export default function App() {
           {designing && progress && <ProgressBar progress={progress} />}
 
           {designError && (
-            <p className="text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded p-2">
+            <p className="text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded p-2 whitespace-pre-line">
               {designError}
             </p>
           )}
@@ -410,6 +577,11 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
           {results && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {resultsSource === 'imported' && (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-semibold uppercase">
+                  Imported
+                </span>
+              )}
               <span>
                 Template: <strong>{results.template_info.name}</strong>
                 {' '}({results.template_info.length.toLocaleString()} bp)
@@ -447,6 +619,12 @@ export default function App() {
             primaryProfileName={primaryProfile?.name || reactionConditions.primary_profile_id}
             selectedRank={selectedPair?.rank}
             onSelect={(pair) => setSelectedPair(selectedPair?.rank === pair.rank ? null : pair)}
+            checkedRanks={checkedRanks}
+            onCheckedChange={setCheckedRanks}
+            onExport={handleExport}
+            exporting={exporting}
+            exportName={exportName}
+            onExportNameChange={setExportName}
           />
 
           {selectedPair && (

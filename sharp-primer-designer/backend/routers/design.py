@@ -152,10 +152,12 @@ async def run_design_stream(req: DesignRequest):
                 primer_constraints=req.primer_constraints,
                 pair_constraints=req.pair_constraints,
                 amplicon_constraints=req.amplicon_constraints,
+                disabled_constraints=req.disabled_constraints,
                 reaction_conditions=req.reaction_conditions,
                 all_profiles=all_profiles,
                 specificity=req.specificity,
                 num_return=req.num_pairs,
+                diversity_mode=req.diversity_mode,
                 on_progress=on_progress,
             )
             result = DesignResponse(
@@ -220,10 +222,12 @@ def run_design(req: DesignRequest):
         primer_constraints=req.primer_constraints,
         pair_constraints=req.pair_constraints,
         amplicon_constraints=req.amplicon_constraints,
+        disabled_constraints=req.disabled_constraints,
         reaction_conditions=req.reaction_conditions,
         all_profiles=all_profiles,
         specificity=req.specificity,
         num_return=req.num_pairs,
+        diversity_mode=req.diversity_mode,
     )
 
     return DesignResponse(
