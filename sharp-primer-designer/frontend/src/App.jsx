@@ -32,7 +32,7 @@ function SettingsModal({ open, onClose, profiles, onProfilesChange, genomes, sel
   if (!open) return null
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h2 className="font-semibold">Settings</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
@@ -43,7 +43,7 @@ function SettingsModal({ open, onClose, profiles, onProfilesChange, genomes, sel
               key={t}
               onClick={() => setTab(t)}
               className={`px-3 py-1.5 text-sm font-medium rounded-t capitalize transition-colors ${
-                tab === t ? 'border border-b-white -mb-px bg-white text-primary' : 'text-muted-foreground hover:text-foreground'
+                tab === t ? 'border border-b-card -mb-px bg-card text-primary' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {t === 'profiles' ? 'Condition Profiles' : t === 'genomes' ? 'Reference Genomes' : 'About'}
@@ -489,9 +489,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b px-4 py-2.5 flex items-center justify-between bg-white shadow-sm">
+      <header className="border-b px-4 py-2.5 flex items-center justify-between bg-card shadow-sm">
         <div>
-          <h1 className="font-bold text-lg">
+          <h1 className="font-bold text-lg text-foreground">
             SHARP Primer Designer
             <span className="ml-2 text-[10px] font-mono text-muted-foreground align-middle">{buildVersion}</span>
           </h1>
@@ -509,7 +509,7 @@ export default function App() {
                 className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                   appMode === mode
                     ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-muted text-muted-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 {label}
@@ -518,20 +518,20 @@ export default function App() {
           </div>
           <button
             onClick={handleImport}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-muted transition-colors"
+            className="px-3 py-1.5 text-sm border rounded text-foreground hover:bg-muted transition-colors"
             title="Import a previously exported primer record (.json)"
           >
             Import
           </button>
           <button
             onClick={() => setHelpOpen(true)}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-muted transition-colors"
+            className="px-3 py-1.5 text-sm border rounded text-foreground hover:bg-muted transition-colors"
           >
             ? Help
           </button>
           <button
             onClick={() => setSettingsOpen(true)}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-muted transition-colors"
+            className="px-3 py-1.5 text-sm border rounded text-foreground hover:bg-muted transition-colors"
           >
             Settings
           </button>
@@ -540,7 +540,7 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden" style={{ display: appMode === 'builder' ? 'flex' : 'none' }}>
         {/* Left panel */}
-        <aside className="w-72 border-r overflow-y-auto p-3 space-y-4 flex-shrink-0 bg-white">
+        <aside className="w-72 border-r overflow-y-auto p-3 space-y-4 flex-shrink-0 bg-card">
           <TemplateInput
             value={template}
             onChange={setTemplate}
@@ -581,7 +581,7 @@ export default function App() {
           <hr />
           {/* Condition profile selection */}
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
               Condition Profiles
             </h3>
             <div className="space-y-1">
@@ -630,7 +630,7 @@ export default function App() {
           {/* Specificity */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
                 Specificity (BLAST)
               </h3>
               {blastAvailable ? (

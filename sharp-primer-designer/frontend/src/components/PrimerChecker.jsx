@@ -182,10 +182,10 @@ export default function PrimerChecker({
   return (
     <div className="flex flex-1 overflow-hidden" style={style}>
       {/* Left panel — input */}
-      <aside className="w-72 border-r overflow-y-auto p-3 space-y-4 flex-shrink-0 bg-white">
+      <aside className="w-72 border-r overflow-y-auto p-3 space-y-4 flex-shrink-0 bg-card">
         {/* Primer sequences */}
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
             Primer Sequences
           </h3>
           <textarea
@@ -202,7 +202,7 @@ export default function PrimerChecker({
 
         {/* Saved primer sets */}
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
             Saved Primer Sets
           </h3>
           <div className="space-y-1.5">
@@ -255,7 +255,7 @@ export default function PrimerChecker({
 
         {/* Condition profiles */}
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
             Condition Profiles
           </h3>
           <div className="space-y-1">
@@ -305,7 +305,7 @@ export default function PrimerChecker({
         {/* Specificity (BLAST) */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
               Specificity (BLAST)
             </h3>
             {blastAvailable ? (
@@ -419,7 +419,7 @@ export default function PrimerChecker({
                     onClick={() => setSection(s)}
                     className={`px-3 py-1 text-xs font-medium rounded-t transition-colors ${
                       section === s
-                        ? 'border border-b-white -mb-px bg-white text-primary'
+                        ? 'border border-b-card -mb-px bg-card text-primary'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >

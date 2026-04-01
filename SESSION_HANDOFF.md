@@ -2,11 +2,11 @@
 **Branch:** `feature/v1-workflow`
 **Repo:** `tomzzzhang/SHARP-Primer-Designer`
 **Version key:** K43
-**Last updated:** 2026-03-31 21:00 PST
+**Last updated:** 2026-04-01 17:00 PST
 
 Read `PRIMER_DESIGNER_CONTEXT.md` for product/company context. This document is the coding session handoff — what was built, how it works, every design decision, and current state.
 
-## Current State (as of 2026-03-31)
+## Current State (as of 2026-04-01)
 
 **K43 is complete and validated.** The tool is fully functional for v1 primer design workflow:
 - Designed 20 primer pairs from lambda phage with MicroMole 33 settings (33nt, GC 47-57%, structural filters, Tm disabled, coverage diversity mode)

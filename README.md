@@ -1,6 +1,6 @@
 # SHARP Primer Designer
 
-**Last Updated:** 2026-03-31 20:00 PST
+**Last Updated:** 2026-04-01 17:00 PST
 
 A local web application for designing and analyzing primer pairs for SHARP Diagnostics' isothermal amplification platform.
 
@@ -49,10 +49,17 @@ http://localhost:5173    <-->    http://localhost:8000
 
 - **Python 3.10+** (Anaconda or Miniconda recommended)
 - **Node.js 18+**
-- **BLAST+** (optional -- for specificity screening)
-  - macOS: `brew install blast`
-  - Ubuntu: `sudo apt install ncbi-blast+`
-  - Windows: [download from NCBI](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+- **NCBI BLAST+** — required for the Specificity (BLAST) screening feature. The tool works without it, but the BLAST panel will show "not available."
+
+  | Platform | Command |
+  |---|---|
+  | macOS (Homebrew) | `brew install blast` |
+  | Ubuntu / Debian | `sudo apt install ncbi-blast+` |
+  | Windows | Download installer from [NCBI BLAST+ releases](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) |
+
+  > **macOS tip:** If you installed BLAST via Homebrew but the app still shows "not available", that's normal — Homebrew installs to `/usr/local/bin` which may not be in the PATH of background processes. The app now searches common install locations automatically, so as long as `blastn` is anywhere in `/usr/local/bin` or `/opt/homebrew/bin` it will be found.
+
+  > **Windows tip:** After running the NCBI installer, open a new terminal and verify with `blastn -version`. If not found, add the BLAST install directory to your system PATH.
 
 ## Setup
 

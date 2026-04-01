@@ -82,7 +82,7 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
 
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
         Template
       </h2>
 
@@ -112,7 +112,7 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
             onClick={() => setTab(t)}
             className={`px-3 py-1.5 text-xs font-medium rounded-t transition-colors ${
               tab === t
-                ? 'border border-b-white -mb-px bg-white text-primary'
+                ? 'border border-b-card -mb-px bg-card text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -188,7 +188,7 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
       {hasSequence && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Target Region</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-foreground">Target Region</label>
             {(value.target_start || value.target_end) && (
               <button
                 onClick={() => onChange({ ...value, target_start: null, target_end: null })}
@@ -242,19 +242,19 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
       )}
 
       {/* Saved sequences */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Saved Sequences</label>
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Saved Sequences</h3>
         {savedSequences && savedSequences.length > 0 ? (
-          <div className="border rounded h-24 overflow-y-auto divide-y">
+          <div className="ml-1 border-2 border-border rounded bg-background overflow-y-scroll h-32 divide-y" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
             {savedSequences.map((seq) => (
               <div
                 key={seq.id}
-                className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 cursor-pointer group"
+                className="flex items-center gap-2 px-2 py-1.5 hover:bg-accent cursor-pointer group border-l-2 border-l-transparent hover:border-l-primary/40"
                 onClick={() => handleLoad(seq)}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{seq.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs font-medium truncate">{seq.name}</p>
+                  <p className="text-[10px] text-muted-foreground">
                     {seq.sequence.length.toLocaleString()} bp
                     {seq.target_start ? ` · target @${seq.target_start}` : ''}
                   </p>
@@ -270,7 +270,7 @@ export default function TemplateInput({ value, onChange, savedSequences, onSaveS
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground italic">
+          <p className="text-xs text-muted-foreground italic ml-1">
             No saved sequences. Enter a sequence and name above, then click Save.
           </p>
         )}

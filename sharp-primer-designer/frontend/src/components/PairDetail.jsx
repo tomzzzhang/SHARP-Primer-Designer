@@ -120,7 +120,7 @@ export default function PairDetail({ pair, profileNames, onClose, tmThreshold })
             onClick={() => setSection(s)}
             className={`px-3 py-1 text-xs font-medium rounded-t transition-colors ${
               section === s
-                ? 'border border-b-white -mb-px bg-white text-primary'
+                ? 'border border-b-background -mb-px bg-background text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
