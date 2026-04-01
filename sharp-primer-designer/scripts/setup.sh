@@ -139,9 +139,9 @@ if [ ! -f "$ROOT/.env" ]; then
     echo "Created .env (update NCBI_EMAIL if needed)"
 fi
 
-# Lambda BLAST DB
+# Reference genomes (Lambda + E. coli K-12)
 if [ "$BLAST_AVAILABLE" -eq 1 ]; then
-    echo "Setting up Lambda phage BLAST database..."
+    echo "Setting up reference genomes for BLAST screening..."
     cd "$ROOT/backend"
     $PYTHON_CMD -m scripts.setup_genomes
 else

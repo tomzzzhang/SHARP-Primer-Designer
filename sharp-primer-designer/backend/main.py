@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,6 +15,17 @@ from routers import check, configs, design, export, genomes, profiles, sequence,
 # Load .env from repo root (one level above backend/)
 _ROOT = Path(__file__).parent.parent
 load_dotenv(_ROOT / ".env")
+
+# ── Seed user data from defaults on first run ────────────────────────────────
+_DATA = Path(__file__).parent / "data"
+_SEED_FILES = ["sequences.json", "configs.json"]
+
+for _fname in _SEED_FILES:
+    _user_file = _DATA / _fname
+    _defaults_file = _DATA / _fname.replace(".json", ".defaults.json")
+    if not _user_file.exists() and _defaults_file.exists():
+        shutil.copy2(_defaults_file, _user_file)
+        print(f"[startup] Seeded {_fname} from defaults")
 
 app = FastAPI(
     title="SHARP Primer Designer API",

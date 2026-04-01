@@ -18,26 +18,39 @@ sys.path.insert(0, str(_BACKEND))
 from core.blast_screen import BLAST_DB_DIR, index_genome
 
 
-LAMBDA_ACCESSION = "J02459"
-LAMBDA_ID = "lambda"
+GENOMES = [
+    {
+        "id": "lambda",
+        "accession": "J02459",
+        "name": "Lambda phage",
+        "size_label": "~49 kbp",
+    },
+    {
+        "id": "ecoli_k12",
+        "accession": "U00096.3",
+        "name": "E. coli K-12 MG1655",
+        "size_label": "~4.6 Mbp",
+    },
+]
 
 
-def setup_lambda():
-    genome_dir = BLAST_DB_DIR / LAMBDA_ID
-    fasta_path = genome_dir / f"{LAMBDA_ID}.fasta"
+def fetch_and_index(genome_id: str, accession: str, name: str, size_label: str):
+    """Fetch a genome from NCBI and build its BLAST database."""
+    genome_dir = BLAST_DB_DIR / genome_id
+    fasta_path = genome_dir / f"{genome_id}.fasta"
 
     if fasta_path.exists():
-        print(f"Lambda FASTA already present at {fasta_path}")
+        print(f"  {name} FASTA already present")
     else:
-        print(f"Fetching Lambda phage ({LAMBDA_ACCESSION}) from NCBI...")
+        print(f"  Fetching {name} ({accession}, {size_label}) from NCBI...")
         try:
-            from Bio import Entrez, SeqIO
+            from Bio import Entrez
 
             email = os.environ.get("NCBI_EMAIL", "support@sharpdx.com")
             Entrez.email = email
             handle = Entrez.efetch(
                 db="nucleotide",
-                id=LAMBDA_ACCESSION,
+                id=accession,
                 rettype="fasta",
                 retmode="text",
             )
@@ -45,26 +58,32 @@ def setup_lambda():
             handle.close()
             genome_dir.mkdir(parents=True, exist_ok=True)
             fasta_path.write_text(fasta_text)
-            print(f"Saved to {fasta_path}")
+            print(f"  Saved to {fasta_path}")
         except Exception as exc:
-            print(f"ERROR: Could not fetch Lambda from NCBI: {exc}")
-            sys.exit(1)
+            print(f"  WARNING: Could not fetch {name} from NCBI: {exc}")
+            return
 
     # Check if already indexed
-    nhr = genome_dir / f"{LAMBDA_ID}.nhr"
+    nhr = genome_dir / f"{genome_id}.nhr"
     if nhr.exists():
-        print("Lambda BLAST DB already indexed.")
+        print(f"  {name} BLAST DB already indexed.")
         return
 
-    print("Building BLAST database...")
+    print(f"  Building BLAST database for {name}...")
     try:
-        index_genome(LAMBDA_ID, fasta_path)
-        print("Lambda BLAST DB ready.")
+        index_genome(genome_id, fasta_path)
+        print(f"  {name} BLAST DB ready.")
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        print(f"WARNING: Could not build BLAST database: {exc}")
-        print("BLAST+ specificity screening will be unavailable.")
-        print("Install BLAST+ and re-run setup to enable it.")
+        print(f"  WARNING: Could not build BLAST database: {exc}")
+        print("  Install BLAST+ and re-run setup to enable it.")
+
+
+def setup_all():
+    print("Setting up reference genomes for BLAST screening:")
+    for genome in GENOMES:
+        fetch_and_index(**genome)
+    print()
 
 
 if __name__ == "__main__":
-    setup_lambda()
+    setup_all()

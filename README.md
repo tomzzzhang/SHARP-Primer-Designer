@@ -74,7 +74,12 @@ chmod +x scripts/setup.sh
 ./scripts/setup.sh
 ```
 
-Setup creates a conda environment `sharp`, installs all dependencies, and indexes the Lambda phage reference genome for BLAST.
+Setup creates a conda environment `sharp`, installs all dependencies (including BLAST+), and indexes reference genomes (Lambda phage + E. coli K-12) for BLAST screening.
+
+On first launch, the app is pre-loaded with:
+- **Lambda phage** sequence (48.5 kbp) in Saved Sequences
+- **Lambda + E. coli K-12** BLAST databases for off-target screening
+- **MicroMole 33** and **L200a** design parameter presets
 
 ## Running
 

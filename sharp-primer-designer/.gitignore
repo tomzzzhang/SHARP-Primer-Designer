@@ -17,6 +17,10 @@ frontend/dist/
 # BLAST databases (large binary files, rebuilt by setup)
 backend/data/genomes/*/
 
+# User data files (seeded from *.defaults.json on first run)
+backend/data/sequences.json
+backend/data/configs.json
+
 # Environment / secrets
 .env
 
