@@ -123,7 +123,7 @@ export default function SequenceBar({ sequenceLength, targetStart, targetEnd, on
           {sequenceLength.toLocaleString()} bp
         </span>
         {hasTarget && (
-          <span className="text-[10px] text-blue-600 font-medium">
+          <span className="text-[10px] font-medium" style={{ color: '#c53035' }}>
             Target: {targetStart.toLocaleString()}–{targetEnd.toLocaleString()}
             {' '}({(targetEnd - targetStart + 1).toLocaleString()} bp)
           </span>
@@ -154,8 +154,8 @@ export default function SequenceBar({ sequenceLength, targetStart, targetEnd, on
             y={BAR_Y}
             width={Math.max(2, bpToX(targetEnd) - bpToX(targetStart))}
             height={BAR_H}
-            fill="#bfdbfe"
-            stroke="#3b82f6"
+            fill="#f5d5d6"
+            stroke="#c53035"
             strokeWidth={0.5}
             rx={1}
           />
@@ -172,7 +172,7 @@ export default function SequenceBar({ sequenceLength, targetStart, targetEnd, on
               y={BAR_Y - 2}
               width={HANDLE_W}
               height={BAR_H + 4}
-              fill={dragging === 'start' ? '#2563eb' : '#3b82f6'}
+              fill={dragging === 'start' ? '#a52830' : '#c53035'}
               rx={2}
               stroke="white"
               strokeWidth={1}
@@ -191,7 +191,7 @@ export default function SequenceBar({ sequenceLength, targetStart, targetEnd, on
               y={BAR_Y - 2}
               width={HANDLE_W}
               height={BAR_H + 4}
-              fill={dragging === 'end' ? '#2563eb' : '#3b82f6'}
+              fill={dragging === 'end' ? '#a52830' : '#c53035'}
               rx={2}
               stroke="white"
               strokeWidth={1}

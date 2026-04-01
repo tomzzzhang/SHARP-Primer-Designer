@@ -216,7 +216,7 @@ export default function ConstraintsPanel({
     <div className="space-y-4">
       {/* Saved configs */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
           Saved Configs
         </h3>
         <div className="space-y-1.5">
@@ -245,11 +245,11 @@ export default function ConstraintsPanel({
           </button>
           {configError && <p className="text-xs text-destructive">{configError}</p>}
           {savedConfigs.length > 0 ? (
-            <div className="border rounded max-h-28 overflow-y-auto divide-y">
+            <div className="ml-1 border-2 border-border rounded bg-background overflow-y-scroll max-h-28 divide-y" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
               {savedConfigs.map((cfg) => (
                 <div
                   key={cfg.id}
-                  className="flex items-center gap-1 px-2 py-1.5 hover:bg-muted/50 cursor-pointer group"
+                  className="flex items-center gap-1 px-2 py-1.5 hover:bg-accent cursor-pointer group border-l-2 border-l-transparent hover:border-l-primary/40"
                   onClick={() => onLoadConfig(cfg)}
                   title="Click to load this config"
                 >
@@ -283,7 +283,7 @@ export default function ConstraintsPanel({
 
       {/* Primer constraints */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
           Primer Constraints
         </h3>
         <div className="space-y-2">
@@ -327,7 +327,7 @@ export default function ConstraintsPanel({
 
       {/* Pair constraints */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
           Pair Constraints
         </h3>
         <div className="space-y-2">
@@ -345,7 +345,7 @@ export default function ConstraintsPanel({
 
       {/* Amplicon constraints */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
           Amplicon
         </h3>
         <MinOptMax

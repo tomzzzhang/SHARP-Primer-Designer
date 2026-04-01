@@ -238,7 +238,7 @@ const SECTIONS = [
 export default function ParameterReference({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b">
           <h2 className="font-semibold text-lg">Parameter Reference</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">

@@ -13,6 +13,7 @@ geometry checking. Multiple viable sites trigger off-target amplicon geometry ch
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import tempfile
 import os
@@ -25,6 +26,22 @@ from .models import BlastHit, ConditionProfile, OffTargetAmplicon
 # Resolved at import time relative to this module's location
 _HERE = Path(__file__).parent.parent
 BLAST_DB_DIR = _HERE / "data" / "genomes"
+
+# Resolve blastn/makeblastdb full paths at startup so the server process
+# doesn't need /usr/local/bin in its PATH (common on macOS with Homebrew/NCBI).
+_EXTRA_PATHS = ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"]
+def _find_blast_bin(name: str) -> str:
+    found = shutil.which(name)
+    if found:
+        return found
+    for d in _EXTRA_PATHS:
+        p = Path(d) / name
+        if p.exists():
+            return str(p)
+    return name  # fall back to bare name; will fail with a clear error
+
+BLASTN = _find_blast_bin("blastn")
+MAKEBLASTDB = _find_blast_bin("makeblastdb")
 
 
 def _safe_blast_path(p: Path) -> str:
@@ -144,7 +161,7 @@ def screen_primer(
 
     try:
         cmd = [
-            "blastn",
+            BLASTN,
             "-task", "blastn-short",
             "-query", query_path,
             "-db", _safe_blast_path(db_path),
@@ -300,7 +317,7 @@ def screen_primers_batch(
 
     try:
         cmd = [
-            "blastn",
+            BLASTN,
             "-task", "blastn-short",
             "-query", query_path,
             "-db", _safe_blast_path(db_path),
@@ -424,7 +441,7 @@ def index_genome(genome_id: str, fasta_path: str | Path) -> None:
     db_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "makeblastdb",
+        MAKEBLASTDB,
         "-in", _safe_blast_path(Path(fasta_path)),
         "-dbtype", "nucl",
         "-out", _safe_blast_path(db_dir / genome_id),
@@ -437,7 +454,7 @@ def blast_version() -> str | None:
     """Return BLAST+ version string, or None if not installed."""
     try:
         result = subprocess.run(
-            ["blastn", "-version"], capture_output=True, text=True, timeout=5
+            [BLASTN, "-version"], capture_output=True, text=True, timeout=5
         )
         first_line = result.stdout.strip().splitlines()[0] if result.stdout else ""
         return first_line or None

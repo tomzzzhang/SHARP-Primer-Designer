@@ -6,7 +6,17 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Geist Variable', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
+        brand: {
+          red: '#c53035',
+          'red-mid': '#a52830',
+          'red-dark': '#7d2126',
+          'red-deep': '#4f2125',
+          black: '#212224',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

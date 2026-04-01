@@ -77,8 +77,8 @@ export default function ResultsTable({ pairs, primaryProfileId, primaryProfileNa
     <div>
       {/* Export bar */}
       {someChecked && (
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-3 py-1.5 mb-2">
-          <span className="text-xs text-blue-700 font-medium whitespace-nowrap">
+        <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded px-3 py-1.5 mb-2">
+          <span className="text-xs text-primary font-medium whitespace-nowrap">
             {checkedRanks.size} pair{checkedRanks.size > 1 ? 's' : ''}
           </span>
           <input
@@ -141,8 +141,8 @@ export default function ResultsTable({ pairs, primaryProfileId, primaryProfileNa
                 <tr
                   key={pair.rank}
                   onClick={() => onSelect(pair)}
-                  className={`cursor-pointer hover:bg-blue-50 transition-colors ${
-                    isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : ''
+                  className={`cursor-pointer hover:bg-accent transition-colors ${
+                    isSelected ? 'bg-accent ring-1 ring-inset ring-primary/30' : ''
                   }`}
                 >
                   <td className="border px-2 py-1 text-center">

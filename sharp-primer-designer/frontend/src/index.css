@@ -1,26 +1,37 @@
+@import "@fontsource-variable/geist";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --ring: 221.2 83.2% 53.3%;
+    /* SHARP brand palette (from logo gradient) */
+    --brand-red: #c53035;
+    --brand-red-mid: #a52830;
+    --brand-red-dark: #7d2126;
+    --brand-red-deep: #4f2125;
+    --brand-black: #212224;
+
+    /* Warm off-white palette — matches Processor 2 */
+    --background: 30 13% 94%;        /* #f3f2f0 */
+    --foreground: 225 4% 14%;        /* #212224 */
+    --card: 30 20% 97%;              /* #f8f7f6 */
+    --card-foreground: 225 4% 14%;
+    --popover: 30 20% 97%;
+    --popover-foreground: 225 4% 14%;
+    --primary: 358 62% 47%;          /* #c53035 SHARP red — readable but not screaming */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 10% 92%;
+    --secondary-foreground: 225 4% 14%;
+    --muted: 30 10% 92%;
+    --muted-foreground: 215 8% 47%;
+    --accent: 30 13% 91%;
+    --accent-foreground: 225 4% 14%;
+    --destructive: 358 62% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 11% 85%;            /* #ddd8d3 */
+    --input: 30 11% 85%;
+    --ring: 358 62% 47%;
     --radius: 0.5rem;
   }
 }
@@ -31,8 +42,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'Geist Variable', system-ui, -apple-system, sans-serif;
   }
+}
+
+/* Global accent color — overrides browser default blue on checkboxes/radios */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--brand-red);
 }
 
 /* Monospace for sequences */

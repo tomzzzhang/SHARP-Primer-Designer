@@ -75,13 +75,13 @@ export default function TemplateMap({ pairs, templateLength, targetRegion, selec
 
   return (
     <div className="relative" ref={containerRef}>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-1">
         Template Map
       </h3>
       <svg
         viewBox={`0 0 ${SVG_W} ${svgHeight}`}
-        className="w-full border rounded bg-white"
-        style={{ fontFamily: 'system-ui, sans-serif' }}
+        className="w-full border rounded bg-card"
+        style={{ fontFamily: "'Geist Variable', system-ui, sans-serif" }}
       >
         {/* ── Template bar ──────────────────────────────────────────────── */}
         {/* Background track */}
@@ -98,8 +98,8 @@ export default function TemplateMap({ pairs, templateLength, targetRegion, selec
             y={PAD_TOP}
             width={toX(targetRegion[1]) - toX(targetRegion[0])}
             height={10}
-            fill="#bfdbfe"
-            stroke="#3b82f6"
+            fill="#f5d5d6"
+            stroke="#c53035"
             strokeWidth={0.5}
           />
         )}
@@ -131,7 +131,7 @@ export default function TemplateMap({ pairs, templateLength, targetRegion, selec
             y={PAD_TOP - 1}
             textAnchor="middle"
             fontSize={7}
-            fill="#3b82f6"
+            fill="#c53035"
           >
             target
           </text>
@@ -282,7 +282,7 @@ export default function TemplateMap({ pairs, templateLength, targetRegion, selec
         </div>
         {targetRegion && (
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="inline-block w-6 h-2 rounded border border-blue-400" style={{ background: '#bfdbfe' }} />
+            <span className="inline-block w-6 h-2 rounded" style={{ background: '#f5d5d6', border: '1px solid #c53035' }} />
             target region
           </div>
         )}

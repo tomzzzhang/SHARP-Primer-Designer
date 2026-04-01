@@ -15,6 +15,18 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        // SSE (Server-Sent Events) requires no proxy timeout
+        configure: (proxy) => {
+          proxy.on('error', (err) => console.error('[proxy error]', err))
+          proxy.on('proxyReq', (_proxyReq, req) => {
+            if (req.url?.includes('/stream')) {
+              _proxyReq.setHeader('Connection', 'keep-alive')
+            }
+          })
+        },
+        // Disable proxy timeout for streaming endpoints
+        timeout: 0,
+        proxyTimeout: 0,
       },
     },
   },
