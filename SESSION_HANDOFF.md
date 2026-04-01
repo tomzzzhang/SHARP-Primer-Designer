@@ -2,7 +2,7 @@
 **Branch:** `feature/v1-workflow`
 **Repo:** `tomzzzhang/SHARP-Primer-Designer`
 **Version key:** K43
-**Last updated:** 2026-03-31 18:00 PST
+**Last updated:** 2026-03-31 21:00 PST
 
 Read `PRIMER_DESIGNER_CONTEXT.md` for product/company context. This document is the coding session handoff — what was built, how it works, every design decision, and current state.
 
