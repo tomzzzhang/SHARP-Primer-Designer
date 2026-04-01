@@ -29,6 +29,9 @@ async function request(method, path, body) {
 // ── Design ────────────────────────────────────────────────────────────────────
 export const designPrimers = (payload) => request('POST', '/design', payload)
 
+// ── Primer Checker ───────────────────────────────────────────────────────────
+export const checkPrimer = (payload) => request('POST', '/check', payload)
+
 // ── Profiles ──────────────────────────────────────────────────────────────────
 export const getProfiles = () => request('GET', '/profiles')
 export const createProfile = (profile) => request('POST', '/profiles', profile)

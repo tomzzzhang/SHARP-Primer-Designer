@@ -157,6 +157,7 @@ export default function ConstraintsPanel({
   onUpdateConfig,
   onLoadConfig,
   onDeleteConfig,
+  onResetDefaults,
 }) {
   const [configName, setConfigName] = useState('')
   const [configError, setConfigError] = useState('')
@@ -207,6 +208,12 @@ export default function ConstraintsPanel({
               Save
             </button>
           </div>
+          <button
+            onClick={onResetDefaults}
+            className="w-full px-2 py-1 text-xs border rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Reset to Defaults
+          </button>
           {configError && <p className="text-xs text-destructive">{configError}</p>}
           {savedConfigs.length > 0 ? (
             <div className="border rounded max-h-28 overflow-y-auto divide-y">

@@ -261,19 +261,20 @@ def export_primers(req: ExportRequest):
 
     json_bytes = json.dumps(notion_record, indent=2).encode("utf-8")
 
-    # Package as zip
+    # Package as zip — files inside a folder named after the target
+    folder = f"{target_name}_{date_str}"
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"SHARP_primer_order_{date_str}.xlsx", xlsx_bytes)
-        zf.writestr(f"SHARP_primer_record_{date_str}.json", json_bytes)
-        zf.writestr(f"SHARP_primer_summary_{date_str}.md", md_summary)
+        zf.writestr(f"{folder}/{target_name}_primer_order_{date_str}.xlsx", xlsx_bytes)
+        zf.writestr(f"{folder}/{target_name}_primer_record_{date_str}.json", json_bytes)
+        zf.writestr(f"{folder}/{target_name}_primer_summary_{date_str}.md", md_summary)
 
     zip_buf.seek(0)
     return StreamingResponse(
         zip_buf,
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="SHARP_primer_export_{date_str}.zip"'
+            "Content-Disposition": f'attachment; filename="{folder}.zip"'
         },
     )
 

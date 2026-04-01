@@ -109,7 +109,8 @@ class BlastHit(BaseModel):
     strand: str  # "plus" or "minus"
     qseq: str = ""         # aligned query (primer) subsequence
     sseq: str = ""         # aligned subject (genome) subsequence
-    hit_tm: Optional[float] = None  # Tm of primer-hit duplex under reaction conditions
+    hit_tm: Optional[float] = None       # Tm under reaction conditions (SantaLucia/primer3)
+    hit_tm_wallace: Optional[float] = None  # Wallace Tm (no salt correction)
 
 
 class OffTargetAmplicon(BaseModel):
@@ -265,6 +266,26 @@ class SavedSequence(BaseModel):
 
 class SavedSequencesResponse(BaseModel):
     sequences: list[SavedSequence]
+
+
+# ─── Sequence fetch API ───────────────────────────────────────────────────────
+
+# ─── Primer Checker ──────────────────────────────────────────────────────────
+
+class CheckRequest(BaseModel):
+    sequences: list[str]  # One or more primer sequences
+    reaction_conditions: ReactionConditions = ReactionConditions()
+    specificity: SpecificityConfig = SpecificityConfig()
+
+
+class CheckResult(BaseModel):
+    primers: list[PrimerResult]
+    # Pair thermo — only populated when exactly 2 sequences provided
+    heterodimer_dg: Optional[float] = None
+    heterodimer_tm: Optional[float] = None
+    tm_diff: Optional[dict[str, dict[str, float]]] = None
+    specificity_status: str = "not_screened"
+    off_target_amplicons: list[OffTargetAmplicon] = []
 
 
 # ─── Sequence fetch API ───────────────────────────────────────────────────────
