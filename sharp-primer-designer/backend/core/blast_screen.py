@@ -27,6 +27,35 @@ _HERE = Path(__file__).parent.parent
 BLAST_DB_DIR = _HERE / "data" / "genomes"
 
 
+def _safe_blast_path(p: Path) -> str:
+    """Return a BLAST-safe path string.
+
+    BLAST+ on Windows cannot handle spaces in the -db argument.
+    Convert to Windows 8.3 short path when spaces are present.
+    For BLAST DB prefixes (no extension), convert the parent directory
+    and re-append the filename.
+    """
+    s = str(p)
+    if " " not in s:
+        return s
+    if os.name == "nt":
+        try:
+            import ctypes
+            # If the path itself exists, convert directly
+            target = p if p.exists() else p.parent
+            if target.exists():
+                buf = ctypes.create_unicode_buffer(512)
+                ctypes.windll.kernel32.GetShortPathNameW(str(target), buf, 512)
+                if buf.value:
+                    if target == p:
+                        return buf.value
+                    # Re-append the filename to the short parent path
+                    return str(Path(buf.value) / p.name)
+        except Exception:
+            pass
+    return s
+
+
 # ─── Thermodynamic Tm for a BLAST hit ────────────────────────────────────────
 
 def _complement(seq: str) -> str:
@@ -35,44 +64,45 @@ def _complement(seq: str) -> str:
     return seq.translate(table)
 
 
+def _wallace_tm(seq: str) -> float:
+    """Wallace rule Tm: 2(A+T) + 4(G+C)."""
+    seq = seq.upper()
+    at = sum(1 for b in seq if b in "AT")
+    gc = sum(1 for b in seq if b in "GC")
+    return float(2 * at + 4 * gc)
+
+
 def calc_hit_tm(
     hit: BlastHit,
     profile: ConditionProfile,
 ) -> float:
     """Calculate Tm for a primer binding at a BLAST hit site.
 
-    Uses primer3.calc_heterodimer on the aligned query and subject sequences
-    under the reaction's salt/Mg/dNTP/primer concentration conditions.
+    Uses primer3 calc_tm on the aligned query sequence (qseq) under the
+    reaction's salt/Mg/dNTP/primer concentration conditions. This computes
+    the Tm of the aligned portion assuming perfect-complement binding.
 
-    For plus-strand hits: primer binds the complement of sseq.
-    For minus-strand hits: primer binds sseq directly.
-    Either way, calc_heterodimer handles finding the best alignment internally.
+    Also sets hit.hit_tm_wallace (Wallace rule, no salt correction).
+
+    For partial matches with mismatches, this overestimates the true Tm
+    (real duplex is less stable than perfect complement). This is
+    conservative: we may flag weak off-targets but won't miss real ones.
     """
     qseq = hit.qseq.replace("-", "")  # remove gaps
-    sseq = hit.sseq.replace("-", "")
 
-    if not qseq or not sseq:
+    if not qseq:
         return 0.0
 
-    # calc_heterodimer wants two single-stranded sequences that might bind.
-    # For a plus-strand hit, the primer (qseq) binds the complement of the
-    # subject. We pass qseq and the reverse-complement of sseq so primer3
-    # can evaluate the duplex.
-    if hit.strand == "plus":
-        target = _complement(sseq)[::-1]  # reverse complement of sseq
-    else:
-        target = sseq[::-1]  # reverse of sseq (already complementary)
+    hit.hit_tm_wallace = round(_wallace_tm(qseq), 1)
 
     try:
-        result = primer3.calc_heterodimer(
-            qseq,
-            target,
+        calc = primer3.thermoanalysis.ThermoAnalysis(
             mv_conc=profile.na_mm + profile.k_mm,
             dv_conc=profile.mg_mm,
             dntp_conc=profile.dntps_mm,
             dna_conc=profile.primer_nm,
         )
-        return round(result.tm, 1)
+        return round(calc.calc_tm(qseq), 1)
     except Exception:
         return 0.0
 
@@ -117,7 +147,7 @@ def screen_primer(
             "blastn",
             "-task", "blastn-short",
             "-query", query_path,
-            "-db", str(db_path),
+            "-db", _safe_blast_path(db_path),
             "-evalue", str(evalue),
             "-word_size", str(word_size),
             "-outfmt",
@@ -273,7 +303,7 @@ def screen_primers_batch(
             "blastn",
             "-task", "blastn-short",
             "-query", query_path,
-            "-db", str(db_path),
+            "-db", _safe_blast_path(db_path),
             "-evalue", str(evalue),
             "-word_size", str(word_size),
             "-outfmt",
@@ -395,9 +425,9 @@ def index_genome(genome_id: str, fasta_path: str | Path) -> None:
 
     cmd = [
         "makeblastdb",
-        "-in", str(fasta_path),
+        "-in", _safe_blast_path(Path(fasta_path)),
         "-dbtype", "nucl",
-        "-out", str(db_dir / genome_id),
+        "-out", _safe_blast_path(db_dir / genome_id),
         "-title", genome_id,
     ]
     subprocess.run(cmd, check=True, capture_output=True, text=True)

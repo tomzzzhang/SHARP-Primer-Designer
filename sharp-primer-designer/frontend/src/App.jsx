@@ -8,6 +8,7 @@ import ProfileManager from './components/ProfileManager'
 import ProgressBar from './components/ProgressBar'
 import ParameterReference from './components/ParameterReference'
 import TemplateMap from './components/TemplateMap'
+import PrimerChecker from './components/PrimerChecker'
 
 function extractApiError(err, fallback) {
   const d = err.detail
@@ -88,6 +89,7 @@ function SettingsModal({ open, onClose, profiles, onProfilesChange, genomes, sel
 // ─── Session persistence ──────────────────────────────────────────────────────
 
 const SESSION_KEY = 'sharp_primer_session'
+const SETTINGS_KEY = 'sharp_primer_settings'
 
 function saveSession(data) {
   try {
@@ -104,6 +106,21 @@ function loadSession() {
   }
 }
 
+function saveSettings(data) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data))
+  } catch (e) { /* localStorage full or unavailable */ }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) {
+    return null
+  }
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -113,24 +130,27 @@ export default function App() {
     target_start: null, target_end: null, excluded_regions: null,
   })
 
+  // Load saved settings (or use defaults)
+  const _saved = loadSettings()
+
   // Constraints
-  const [primerConstraints, setPrimerConstraints] = useState(DEFAULT_PRIMER_CONSTRAINTS)
-  const [pairConstraints, setPairConstraints] = useState(DEFAULT_PAIR_CONSTRAINTS)
-  const [ampliconConstraints, setAmpliconConstraints] = useState(DEFAULT_AMPLICON_CONSTRAINTS)
-  const [numPairs, setNumPairs] = useState(10)
-  const [enabledConstraints, setEnabledConstraints] = useState(DEFAULT_ENABLED_CONSTRAINTS)
-  const [diversityMode, setDiversityMode] = useState('off')
+  const [primerConstraints, setPrimerConstraints] = useState(_saved?.primerConstraints || DEFAULT_PRIMER_CONSTRAINTS)
+  const [pairConstraints, setPairConstraints] = useState(_saved?.pairConstraints || DEFAULT_PAIR_CONSTRAINTS)
+  const [ampliconConstraints, setAmpliconConstraints] = useState(_saved?.ampliconConstraints || DEFAULT_AMPLICON_CONSTRAINTS)
+  const [numPairs, setNumPairs] = useState(_saved?.numPairs ?? 10)
+  const [enabledConstraints, setEnabledConstraints] = useState(_saved?.enabledConstraints || DEFAULT_ENABLED_CONSTRAINTS)
+  const [diversityMode, setDiversityMode] = useState(_saved?.diversityMode || 'off')
 
   // Profiles and conditions
   const [profiles, setProfiles] = useState([])
-  const [reactionConditions, setReactionConditions] = useState(DEFAULT_REACTION_CONDITIONS)
+  const [reactionConditions, setReactionConditions] = useState(_saved?.reactionConditions || DEFAULT_REACTION_CONDITIONS)
 
   // Genomes
   const [genomes, setGenomes] = useState([])
-  const [selectedGenomeIds, setSelectedGenomeIds] = useState(['lambda'])
-  const [blastEnabled, setBlastEnabled] = useState(true)
+  const [selectedGenomeIds, setSelectedGenomeIds] = useState(_saved?.selectedGenomeIds || ['lambda'])
+  const [blastEnabled, setBlastEnabled] = useState(_saved?.blastEnabled ?? true)
   const [blastAvailable, setBlastAvailable] = useState(true)
-  const [offTargetTmThreshold, setOffTargetTmThreshold] = useState(DEFAULT_SPECIFICITY.off_target_tm_threshold)
+  const [offTargetTmThreshold, setOffTargetTmThreshold] = useState(_saved?.offTargetTmThreshold ?? DEFAULT_SPECIFICITY.off_target_tm_threshold)
 
   // Results
   const [results, setResults] = useState(null)
@@ -156,6 +176,18 @@ export default function App() {
 
   // Version key (fetched from backend, single source of truth)
   const [buildVersion, setBuildVersion] = useState('...')
+
+  // App mode: 'builder' or 'checker'
+  const [appMode, setAppMode] = useState('builder')
+
+  // Persist settings to localStorage whenever they change
+  useEffect(() => {
+    saveSettings({
+      primerConstraints, pairConstraints, ampliconConstraints,
+      numPairs, enabledConstraints, diversityMode,
+      reactionConditions, selectedGenomeIds, blastEnabled, offTargetTmThreshold,
+    })
+  }, [primerConstraints, pairConstraints, ampliconConstraints, numPairs, enabledConstraints, diversityMode, reactionConditions, selectedGenomeIds, blastEnabled, offTargetTmThreshold])
 
   // Load profiles, genomes, saved sequences, check BLAST, and restore session on mount
   useEffect(() => {
@@ -467,7 +499,23 @@ export default function App() {
             Tm estimates are reference only — not a predictor of SHARP isothermal performance
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Mode switcher */}
+          <div className="flex border rounded overflow-hidden mr-1">
+            {[['builder', 'Builder'], ['checker', 'Checker']].map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setAppMode(mode)}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  appMode === mode
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             onClick={handleImport}
             className="px-3 py-1.5 text-sm border rounded hover:bg-muted transition-colors"
@@ -490,7 +538,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" style={{ display: appMode === 'builder' ? 'flex' : 'none' }}>
         {/* Left panel */}
         <aside className="w-72 border-r overflow-y-auto p-3 space-y-4 flex-shrink-0 bg-white">
           <TemplateInput
@@ -520,6 +568,14 @@ export default function App() {
             onUpdateConfig={handleUpdateConfig}
             onLoadConfig={handleLoadConfig}
             onDeleteConfig={handleDeleteConfig}
+            onResetDefaults={() => {
+              setPrimerConstraints(DEFAULT_PRIMER_CONSTRAINTS)
+              setPairConstraints(DEFAULT_PAIR_CONSTRAINTS)
+              setAmpliconConstraints(DEFAULT_AMPLICON_CONSTRAINTS)
+              setEnabledConstraints(DEFAULT_ENABLED_CONSTRAINTS)
+              setNumPairs(10)
+              setDiversityMode('off')
+            }}
           />
 
           <hr />
@@ -705,10 +761,30 @@ export default function App() {
               pair={selectedPair}
               profileNames={profileNames}
               onClose={() => setSelectedPair(null)}
+              tmThreshold={offTargetTmThreshold}
             />
           )}
         </main>
       </div>
+        <PrimerChecker
+          style={{ display: appMode === 'checker' ? 'flex' : 'none' }}
+          profiles={profiles}
+          genomes={genomes}
+          reactionConditions={reactionConditions}
+          onReactionConditionsChange={setReactionConditions}
+          blastEnabled={blastEnabled}
+          onBlastEnabledChange={setBlastEnabled}
+          blastAvailable={blastAvailable}
+          selectedGenomeIds={selectedGenomeIds}
+          onSelectedGenomeIdsChange={setSelectedGenomeIds}
+          offTargetTmThreshold={offTargetTmThreshold}
+          onOffTargetTmThresholdChange={setOffTargetTmThreshold}
+          onGenomesChange={setGenomes}
+          onDesignSimilar={(constraints) => {
+            setPrimerConstraints(constraints)
+            setAppMode('builder')
+          }}
+        />
 
       {helpOpen && <ParameterReference onClose={() => setHelpOpen(false)} />}
 

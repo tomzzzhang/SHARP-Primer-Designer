@@ -71,7 +71,7 @@ function ThermoTable({ pair }) {
   )
 }
 
-export default function PairDetail({ pair, profileNames, onClose }) {
+export default function PairDetail({ pair, profileNames, onClose, tmThreshold }) {
   const [section, setSection] = useState('tm')
 
   if (!pair) return null
@@ -144,6 +144,7 @@ export default function PairDetail({ pair, profileNames, onClose }) {
             forward={pair.forward}
             reverse={pair.reverse}
             offTargetAmplicons={pair.off_target_amplicons}
+            tmThreshold={tmThreshold}
           />
         )}
       </div>
