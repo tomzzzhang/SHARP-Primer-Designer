@@ -88,6 +88,37 @@ function EnableCheckbox({ constraintKey, enabled, onChange }) {
 
 // ─── Field components ────────────────────────────────────────────────────────
 
+function NumInput({ value, onChange, step = 1, disabled = false, className = '' }) {
+  // Allow empty string while typing; parse to number on blur
+  const [localVal, setLocalVal] = useState(null) // null = use prop value
+  const display = localVal !== null ? localVal : value
+
+  return (
+    <input
+      type="number"
+      step={step}
+      disabled={disabled}
+      className={className}
+      value={display}
+      onChange={(e) => {
+        const raw = e.target.value
+        if (raw === '' || raw === '-') {
+          setLocalVal(raw)
+        } else {
+          setLocalVal(null)
+          onChange(parseFloat(raw) || 0)
+        }
+      }}
+      onBlur={() => {
+        if (localVal !== null) {
+          onChange(parseFloat(localVal) || 0)
+          setLocalVal(null)
+        }
+      }}
+    />
+  )
+}
+
 function MinOptMax({ label, minKey, optKey, maxKey, values, onChange, step = 1, unit = '', tip, constraintKey, enabled, onEnabledChange }) {
   const isEnabled = enabled[constraintKey] !== false
   return (
@@ -101,13 +132,12 @@ function MinOptMax({ label, minKey, optKey, maxKey, values, onChange, step = 1, 
         {[['min', minKey], ['opt', optKey], ['max', maxKey]].map(([lbl, key]) => (
           <div key={key}>
             <div className="text-[10px] text-muted-foreground text-center">{lbl}</div>
-            <input
-              type="number"
+            <NumInput
               step={step}
               disabled={!isEnabled}
               className="w-full border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
               value={values[key]}
-              onChange={(e) => onChange({ ...values, [key]: parseFloat(e.target.value) || 0 })}
+              onChange={(v) => onChange({ ...values, [key]: v })}
             />
           </div>
         ))}
@@ -125,13 +155,12 @@ function SingleField({ label, fieldKey, values, onChange, step = 0.1, unit = '',
         <span className={`whitespace-nowrap ${!isEnabled ? 'line-through' : ''}`}>{label}{unit ? ` (${unit})` : ''}</span>
         {tip && <HelpDot tip={tip} />}
       </label>
-      <input
-        type="number"
+      <NumInput
         step={step}
         disabled={!isEnabled}
         className="w-20 border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
         value={values[fieldKey]}
-        onChange={(e) => onChange({ ...values, [fieldKey]: parseFloat(e.target.value) || 0 })}
+        onChange={(v) => onChange({ ...values, [fieldKey]: v })}
       />
     </div>
   )

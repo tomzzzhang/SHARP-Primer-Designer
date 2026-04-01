@@ -126,6 +126,18 @@ const SECTIONS = [
         default: '0',
         description: 'Maximum number of off-target amplicons allowed before a primer pair is flagged as non-specific. An off-target amplicon is detected when the forward and reverse primers both have BLAST hits on the same reference sequence in the correct orientation and within a plausible amplicon size range. Set to 0 for maximum specificity.',
       },
+      {
+        name: 'Off-Target Tm Threshold',
+        fields: 'off_target_tm_threshold',
+        default: '45.0',
+        description: 'Minimum binding Tm (condition-adjusted, SantaLucia/primer3) for a BLAST hit to be considered a viable off-target. Hits below this Tm are shown faded in the BLAST table and excluded from the pass/fail decision. Raise this to reduce false off-target calls (e.g., 55-60 for SHARP at 65C). The Hit Tm shown in the BLAST table uses calc_tm on the aligned portion of the primer under the primary condition profile.',
+      },
+      {
+        name: 'Hit Tm Calculation',
+        fields: '---',
+        default: '---',
+        description: 'Each BLAST hit\'s Tm is computed using primer3 calc_tm on the aligned query sequence (qseq) under the primary condition profile\'s salt/Mg/dNTP concentrations. For perfect matches, this equals the SantaLucia/primer3 Tm in the Tm grid. For partial matches with mismatches, this overestimates the true binding Tm (conservative). On-target hits (100% identity, full primer length) are highlighted green. Viable off-targets (Tm >= threshold) show red Tm text.',
+      },
     ],
   },
   {
@@ -154,6 +166,70 @@ const SECTIONS = [
         fields: '—',
         default: '—',
         description: 'A simple, condition-independent estimate: Tm = 2°C × (A+T) + 4°C × (G+C). Does not account for nearest-neighbor interactions, salt concentrations, or primer concentration. Included as a quick sanity check and because it is still widely referenced in literature. Only accurate for short oligonucleotides (14–20 nt) in standard salt conditions.',
+      },
+    ],
+  },
+  {
+    title: 'Primer Checker',
+    params: [
+      {
+        name: 'Overview',
+        fields: '\u2014',
+        default: '\u2014',
+        description: 'The Checker tab analyzes existing primer sequences without running a design. Enter one or more sequences (one per line) to compute Tm grids, structural thermodynamics (hairpin, homodimer, end stability), and BLAST specificity screening. If exactly two primers are entered, pair thermodynamics (heterodimer) are also computed.',
+      },
+      {
+        name: 'Saved Primer Sets',
+        fields: '\u2014',
+        default: '\u2014',
+        description: 'Save named sets of primer sequences for quick recall. Stored locally in your browser. Enter primers, type a name, click Save. Click a saved set to reload it.',
+      },
+      {
+        name: 'Design Similar Primers',
+        fields: '\u2014',
+        default: '\u2014',
+        description: 'After checking primers, click "Design Similar Primers" to switch to the Builder with constraints derived from the checked primers: length range (actual lengths +/- 2nt), GC range (actual GC% +/- 5%).',
+      },
+    ],
+  },
+  {
+    title: 'Builder Features',
+    params: [
+      {
+        name: 'Position Diversity',
+        fields: 'diversity_mode',
+        default: 'off',
+        description: 'Controls how primer candidates are spread across the template. Off: pure penalty ranking. Sparse: 10bp min spacing. Spread: 25bp min spacing. Coverage (region bins): divides the template into equal sections and picks the best candidate from each, ensuring primers cover the full template.',
+      },
+      {
+        name: 'Constraint Enable/Disable',
+        fields: '\u2014',
+        default: 'All enabled',
+        description: 'Each parameter has a checkbox. Unchecked = primer3 ignores that dimension entirely (permissive bounds + zero penalty weight). Useful for SHARP: disable Tm (isothermal, Tm not predictive) and delta-Tm while keeping structural filters active.',
+      },
+      {
+        name: 'Saved Configs',
+        fields: '\u2014',
+        default: '\u2014',
+        description: 'Save named parameter presets (all constraints, enabled flags, diversity mode, condition profiles, BLAST settings). Click a saved config to load it.',
+      },
+      {
+        name: 'Settings Persistence',
+        fields: '\u2014',
+        default: '\u2014',
+        description: 'All settings (constraints, profiles, BLAST, diversity mode) are saved to your browser automatically and restored on next visit.',
+      },
+      {
+        name: 'Export Package',
+        fields: '\u2014',
+        default: '\u2014',
+        description: 'Select primer pairs with checkboxes, enter a target name, click Export. Downloads a zip containing a named folder with IDT bulk order sheet (.xlsx), Notion-ready record (.json), and human-readable summary (.md).',
+      },
+      {
+        name: 'Off-Target Tm Threshold',
+        fields: 'off_target_tm_threshold',
+        default: '45.0',
+        description: 'Minimum binding Tm (condition-adjusted) for a BLAST hit to count as a viable off-target. Hits below this are shown faded and excluded from the pass/fail decision. The Hit Tm uses calc_tm on the aligned portion under the primary condition profile. On-target hits (100% identity, full primer length) are highlighted green.',
       },
     ],
   },
