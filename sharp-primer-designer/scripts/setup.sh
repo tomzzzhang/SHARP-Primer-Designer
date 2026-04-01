@@ -9,17 +9,70 @@ CONDA_ENV_NAME="sharp"
 echo "=== SHARP Primer Designer Setup ==="
 echo ""
 
-# Check BLAST+
+# ── BLAST+ ────────────────────────────────────────────────────────────────────
+# Required for specificity screening. Auto-install if missing.
+
 echo "Checking BLAST+..."
 BLAST_AVAILABLE=0
-if command -v blastn &>/dev/null; then
+BLASTN=""
+
+# Search common locations (backend also does this at runtime)
+for dir in "" "/usr/local/bin/" "/opt/homebrew/bin/" "/usr/bin/"; do
+    if [ -x "${dir}blastn" ]; then
+        BLASTN="${dir}blastn"
+        break
+    fi
+done
+
+if [ -n "$BLASTN" ]; then
     BLAST_AVAILABLE=1
-    blastn -version | head -1
+    "$BLASTN" -version | head -1
 else
-    echo "WARNING: BLAST+ not found. Specificity screening will be unavailable."
-    echo "  macOS: brew install blast"
-    echo "  Ubuntu: sudo apt install ncbi-blast+"
-    echo "  You can install it later and restart the app."
+    echo "BLAST+ not found — attempting to install..."
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if command -v brew &>/dev/null; then
+            echo "  Installing via Homebrew..."
+            brew install blast 2>&1 | tail -3
+        else
+            echo "  Homebrew not found. Installing Homebrew first..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            brew install blast 2>&1 | tail -3
+        fi
+    elif command -v apt-get &>/dev/null; then
+        # Debian / Ubuntu
+        echo "  Installing via apt (may require sudo password)..."
+        sudo apt-get update -qq && sudo apt-get install -y -qq ncbi-blast+
+    elif command -v dnf &>/dev/null; then
+        # Fedora / RHEL
+        echo "  Installing via dnf (may require sudo password)..."
+        sudo dnf install -y -q blast+
+    elif command -v yum &>/dev/null; then
+        # Older RHEL / CentOS
+        echo "  Installing via yum (may require sudo password)..."
+        sudo yum install -y -q blast+
+    else
+        echo "  Could not auto-install BLAST+. Please install manually:"
+        echo "    https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/"
+    fi
+
+    # Re-check after install
+    for dir in "" "/usr/local/bin/" "/opt/homebrew/bin/" "/usr/bin/"; do
+        if [ -x "${dir}blastn" ]; then
+            BLASTN="${dir}blastn"
+            break
+        fi
+    done
+
+    if [ -n "$BLASTN" ]; then
+        BLAST_AVAILABLE=1
+        echo "  BLAST+ installed successfully:"
+        "$BLASTN" -version | head -1
+    else
+        echo "  WARNING: BLAST+ installation failed. Specificity screening will be unavailable."
+        echo "  You can install it later and restart the app."
+    fi
 fi
 echo ""
 

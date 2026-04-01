@@ -49,7 +49,7 @@ http://localhost:5173    <-->    http://localhost:8000
 
 - **Python 3.10+** (Anaconda or Miniconda recommended)
 - **Node.js 18+**
-- **NCBI BLAST+** — required for the Specificity (BLAST) screening feature. The tool works without it, but the BLAST panel will show "not available."
+- **NCBI BLAST+** — required for the Specificity (BLAST) screening feature. **The setup script will install it automatically** on macOS (via Homebrew) and Linux (via apt/dnf). If auto-install fails or you're on Windows, install manually:
 
   | Platform | Command |
   |---|---|
@@ -57,9 +57,7 @@ http://localhost:5173    <-->    http://localhost:8000
   | Ubuntu / Debian | `sudo apt install ncbi-blast+` |
   | Windows | Download installer from [NCBI BLAST+ releases](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) |
 
-  > **macOS tip:** If you installed BLAST via Homebrew but the app still shows "not available", that's normal — Homebrew installs to `/usr/local/bin` which may not be in the PATH of background processes. The app now searches common install locations automatically, so as long as `blastn` is anywhere in `/usr/local/bin` or `/opt/homebrew/bin` it will be found.
-
-  > **Windows tip:** After running the NCBI installer, open a new terminal and verify with `blastn -version`. If not found, add the BLAST install directory to your system PATH.
+  > **Note:** The app searches `/usr/local/bin`, `/opt/homebrew/bin`, and system PATH automatically — no manual PATH configuration needed on macOS or Linux.
 
 ## Setup
 
