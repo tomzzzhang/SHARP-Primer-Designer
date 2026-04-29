@@ -1,6 +1,9 @@
 # Claude Code
 .claude/
 
+# Machine-local AI session context (not for sharing)
+CLAUDE.local.md
+
 # Python
 __pycache__/
 *.pyc

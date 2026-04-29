@@ -1,6 +1,6 @@
 # SHARP Primer Designer — Project Specification
 
-**Last Updated:** 2026-03-31 21:00 PST
+**Last Updated:** 2026-04-29 PST — Claude
 
 ## Overview
 
