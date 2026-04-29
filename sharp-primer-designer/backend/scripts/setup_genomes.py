@@ -20,13 +20,13 @@ from core.blast_screen import BLAST_DB_DIR, index_genome
 
 GENOMES = [
     {
-        "id": "lambda",
+        "genome_id": "lambda",
         "accession": "J02459",
         "name": "Lambda phage",
         "size_label": "~49 kbp",
     },
     {
-        "id": "ecoli_k12",
+        "genome_id": "ecoli_k12",
         "accession": "U00096.3",
         "name": "E. coli K-12 MG1655",
         "size_label": "~4.6 Mbp",
