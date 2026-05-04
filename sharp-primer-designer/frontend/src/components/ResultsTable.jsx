@@ -41,12 +41,10 @@ function CopyButton({ text }) {
  *   onSelect: (pair) => void
  *   checkedRanks: Set<number>
  *   onCheckedChange: (ranks: Set<number>) => void
- *   onExport: () => void
- *   exporting: boolean
- *   exportName: string
- *   onExportNameChange: (name: string) => void
+ *   onOpenExportWizard: () => void   // open the export wizard for the checked rows
+ *   exporting: boolean               // dim the launcher while a download is in flight
  */
-export default function ResultsTable({ pairs, primaryProfileId, primaryProfileName, selectedRank, onSelect, checkedRanks, onCheckedChange, onExport, exporting, exportName, onExportNameChange }) {
+export default function ResultsTable({ pairs, primaryProfileId, primaryProfileName, selectedRank, onSelect, checkedRanks, onCheckedChange, onOpenExportWizard, exporting }) {
   if (!pairs || pairs.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
@@ -75,25 +73,19 @@ export default function ResultsTable({ pairs, primaryProfileId, primaryProfileNa
 
   return (
     <div>
-      {/* Export bar */}
+      {/* Export bar — launches the wizard for renaming + map preview */}
       {someChecked && (
         <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded px-3 py-1.5 mb-2">
           <span className="text-xs text-primary font-medium whitespace-nowrap">
-            {checkedRanks.size} pair{checkedRanks.size > 1 ? 's' : ''}
+            {checkedRanks.size} pair{checkedRanks.size > 1 ? 's' : ''} selected
           </span>
-          <input
-            type="text"
-            value={exportName}
-            onChange={(e) => onExportNameChange(e.target.value)}
-            placeholder="Target name for export..."
-            className="flex-1 border rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+          <span className="flex-1" />
           <button
-            onClick={onExport}
-            disabled={exporting || !exportName.trim()}
+            onClick={onOpenExportWizard}
+            disabled={exporting}
             className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
           >
-            {exporting ? 'Exporting...' : 'Export Selected'}
+            {exporting ? 'Exporting…' : 'Export Selected…'}
           </button>
         </div>
       )}

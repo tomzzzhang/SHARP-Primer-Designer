@@ -1,6 +1,6 @@
 # CLAUDE.md — SHARP Primer Designer
 
-**Last Updated:** 2026-04-29 PST — Claude
+**Last Updated:** 2026-05-04 PST — Claude
 
 ## Session Start Protocol
 
@@ -50,7 +50,7 @@ SHARP Primer Designer.bat   # double-click launcher
 sharp-primer-designer/
 ├── backend/                     FastAPI, localhost:8000
 │   ├── main.py                  Entry point, router registration, /health, /api/version
-│   │                            Seeds sequences.json + configs.json from *.defaults.json on first run
+│   │                            Seeds sequences.json + configs.json + ordered_primers.json from *.defaults.json on first run
 │   ├── core/
 │   │   ├── primer_engine.py     Main pipeline: primer3 → Tm → BLAST → diversity filter
 │   │   ├── blast_screen.py      Batched BLAST subprocess wrapper + per-hit Tm filtering
@@ -62,16 +62,19 @@ sharp-primer-designer/
 │   │   ├── design.py            POST /api/design/stream — SSE streaming design pipeline
 │   │   ├── export.py            POST /api/export (zip download), POST /api/import
 │   │   ├── genomes.py           Genome CRUD for BLAST databases
+│   │   ├── ordered_primers.py   GET/POST/DELETE /api/ordered_primers — exclusion library + .json/.zip/.xlsx import
 │   │   ├── profiles.py          Condition profile CRUD
 │   │   ├── sequence.py          Single sequence fetch (NCBI accession)
 │   │   └── sequences.py         GET/POST/DELETE /api/sequences — saved sequences library
 │   └── data/
-│       ├── sequences.defaults.json   Shipped defaults (Lambda phage pre-loaded)
-│       ├── configs.defaults.json     Shipped defaults (MicroMole 33 + L200a presets)
-│       ├── profiles.json             Condition profiles (SHARP CutSmart, IDT, NEB, custom)
-│       ├── genomes/                  BLAST databases (gitignored, rebuilt by setup)
-│       ├── sequences.json            User data — gitignored, seeded from defaults on first run
-│       └── configs.json              User data — gitignored, seeded from defaults on first run
+│       ├── sequences.defaults.json       Shipped defaults (Lambda phage pre-loaded)
+│       ├── configs.defaults.json         Shipped defaults (MicroMole 33 + L200a presets)
+│       ├── ordered_primers.defaults.json Empty seed for the exclusion library
+│       ├── profiles.json                 Condition profiles (SHARP CutSmart, IDT, NEB, custom)
+│       ├── genomes/                      BLAST databases (gitignored, rebuilt by setup)
+│       ├── sequences.json                User data — gitignored, seeded from defaults on first run
+│       ├── configs.json                  User data — gitignored, seeded from defaults on first run
+│       └── ordered_primers.json          User data — gitignored, seeded from defaults on first run
 ├── frontend/                    React 18 + Vite, localhost:5173
 │   └── src/
 │       ├── App.jsx              Main layout, all state, all event handlers
@@ -88,6 +91,7 @@ sharp-primer-designer/
 │           ├── TmGrid.jsx             Tm grid table component
 │           ├── GenomeManager.jsx      BLAST genome selection + CRUD
 │           ├── ProfileManager.jsx     Condition profile CRUD
+│           ├── OrderedPrimersManager.jsx Exclusion library modal (paste / file import / list)
 │           ├── ParameterReference.jsx Help / parameter reference modal
 │           ├── ProgressBar.jsx        Design progress indicator
 │           └── SequenceBar.jsx        Sequence ruler (scaffolded, not fully wired)
@@ -129,9 +133,12 @@ primer3 converges on its penalty optimum and returns near-identical pairs from o
 All unique primer sequences are batched into one multi-sequence FASTA per genome call (not one BLAST per primer). Outfmt includes `qseq sseq` for per-hit Tm calculation. Fast-path: if a primer has ≤1 viable binding site (Tm ≥ threshold), skip amplicon check.
 
 ### User data seeding
-`sequences.json` and `configs.json` are gitignored (user-editable data). `main.py` seeds them from `*.defaults.json` on first run if they don't exist. Never commit the user data files — commit only the defaults.
+`sequences.json`, `configs.json`, and `ordered_primers.json` are gitignored (user-editable data). `main.py` seeds each from its `*.defaults.json` counterpart on first run if missing. Never commit the user data files — commit only the defaults.
 
-## Features (v0.1.0)
+### Ordered-primers exclusion filter (primer_engine.py)
+After primer3 returns candidates and Tm grids are computed, but **before** BLAST screening, any pair where either primer's 5'→3' sequence (case-insensitive, ACGT-normalized) appears in `excluded_sequences` is dropped. Filter runs pre-BLAST so we don't pay BLAST cost for primers we'd reject anyway. Count is surfaced as `design_metadata.excluded_pair_count` so the UI can explain shrunken result sets. The library is populated through the Builder's "Manage library" button; toggle is its own state, NOT routed through `disabled_constraints` (which only governs primer3 hard limits).
+
+## Features (v0.2.0)
 
 ### Builder tab
 - Primer3-powered design with configurable constraints (length, Tm, GC%, poly-X, self-comp, hairpin, pair-comp, amplicon size)
@@ -139,10 +146,11 @@ All unique primer sequences are batched into one multi-sequence FASTA per genome
 - Position diversity modes: Off, Sparse, Spread, Coverage
 - Multi-method Tm analysis (4 methods × multiple condition profiles)
 - BLAST+ off-target screening with per-hit thermodynamic Tm filtering
-- Export: zip with IDT bulk order sheet (.xlsx) + Notion record (.json) + summary (.md)
+- Export wizard: review/rename each forward + reverse primer before export; target name auto-propagates into untouched fields. Bundles IDT bulk order sheet (.xlsx), Notion record (.json), markdown summary (.md), and a position map (.svg) of the selected pairs.
 - Import: reload previously exported records
 - Saved configs (named parameter presets)
 - Saved sequences library
+- Ordered-primers exclusion library: paste / import .json/.zip/.xlsx; pairs with already-ordered primers are skipped pre-BLAST
 
 ### Checker tab
 - Analyze existing primer sequences without running design
@@ -164,9 +172,11 @@ All unique primer sequences are batched into one multi-sequence FASTA per genome
 | Primer Builder (primer3 + Tm + BLAST + diversity) | Done |
 | Primer Checker | Done |
 | Export (IDT xlsx + Notion JSON + summary zip) | Done |
+| Export wizard with per-primer rename + position map SVG | Done (v0.2.0) |
 | Import (reload exported JSON) | Done |
 | Saved sequences library | Done |
 | Saved configs (parameter presets) | Done |
+| Ordered-primers exclusion library | Done |
 | Condition profiles | Done |
 | BLAST+ auto-install in setup | Done |
 | SHARP brand theme | Done |

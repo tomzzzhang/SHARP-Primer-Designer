@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import check, configs, design, export, genomes, profiles, sequence, sequences
+from routers import check, configs, design, export, genomes, ordered_primers, profiles, sequence, sequences
 
 # Load .env from repo root (one level above backend/)
 _ROOT = Path(__file__).parent.parent
@@ -18,7 +18,7 @@ load_dotenv(_ROOT / ".env")
 
 # ── Seed user data from defaults on first run ────────────────────────────────
 _DATA = Path(__file__).parent / "data"
-_SEED_FILES = ["sequences.json", "configs.json"]
+_SEED_FILES = ["sequences.json", "configs.json", "ordered_primers.json"]
 
 for _fname in _SEED_FILES:
     _user_file = _DATA / _fname
@@ -48,6 +48,7 @@ app.include_router(check.router)
 app.include_router(configs.router)
 app.include_router(design.router)
 app.include_router(export.router)
+app.include_router(ordered_primers.router)
 app.include_router(profiles.router)
 app.include_router(genomes.router)
 app.include_router(sequence.router)

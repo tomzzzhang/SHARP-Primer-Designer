@@ -9,13 +9,15 @@ import ProgressBar from './components/ProgressBar'
 import ParameterReference from './components/ParameterReference'
 import TemplateMap from './components/TemplateMap'
 import PrimerChecker from './components/PrimerChecker'
+import OrderedPrimersManager from './components/OrderedPrimersManager'
+import ExportWizard from './components/ExportWizard'
 
 function extractApiError(err, fallback) {
   const d = err.detail
   if (Array.isArray(d)) return d.map((e) => e.msg).join('; ')
   return d || fallback
 }
-import { getProfiles, getGenomes, getSequences, saveSequence, deleteSequence, getConfigs, saveConfigApi, updateConfigApi, deleteConfigApi } from './api/client'
+import { getProfiles, getGenomes, getSequences, saveSequence, deleteSequence, getConfigs, saveConfigApi, updateConfigApi, deleteConfigApi, getOrderedPrimers } from './api/client'
 import {
   DEFAULT_PRIMER_CONSTRAINTS,
   DEFAULT_PAIR_CONSTRAINTS,
@@ -159,8 +161,8 @@ export default function App() {
   const [designError, setDesignError] = useState('')
   const [progress, setProgress] = useState(null)  // {step, message, pct}
   const [checkedRanks, setCheckedRanks] = useState(new Set())
-  const [exportName, setExportName] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [exportWizardOpen, setExportWizardOpen] = useState(false)
   const [resultsSource, setResultsSource] = useState(null) // null = designed, "imported" = imported
 
   // Saved sequences
@@ -168,6 +170,11 @@ export default function App() {
 
   // Saved configs (parameter presets)
   const [savedConfigs, setSavedConfigs] = useState([])
+
+  // Ordered primers (exclusion library)
+  const [orderedPrimers, setOrderedPrimers] = useState([])
+  const [excludeOrdered, setExcludeOrdered] = useState(_saved?.excludeOrdered ?? true)
+  const [orderedManagerOpen, setOrderedManagerOpen] = useState(false)
 
   // Settings modal & help
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -186,8 +193,9 @@ export default function App() {
       primerConstraints, pairConstraints, ampliconConstraints,
       numPairs, enabledConstraints, diversityMode,
       reactionConditions, selectedGenomeIds, blastEnabled, offTargetTmThreshold,
+      excludeOrdered,
     })
-  }, [primerConstraints, pairConstraints, ampliconConstraints, numPairs, enabledConstraints, diversityMode, reactionConditions, selectedGenomeIds, blastEnabled, offTargetTmThreshold])
+  }, [primerConstraints, pairConstraints, ampliconConstraints, numPairs, enabledConstraints, diversityMode, reactionConditions, selectedGenomeIds, blastEnabled, offTargetTmThreshold, excludeOrdered])
 
   // Load profiles, genomes, saved sequences, check BLAST, and restore session on mount
   useEffect(() => {
@@ -207,6 +215,7 @@ export default function App() {
     }).catch(console.error)
     loadSavedSequences()
     loadSavedConfigs()
+    loadOrderedPrimers()
 
     // Restore previous session (results + template)
     const session = loadSession()
@@ -230,6 +239,13 @@ export default function App() {
   async function handleDeleteSequence(id) {
     await deleteSequence(id)
     loadSavedSequences()
+  }
+
+  // ── Ordered primers ──────────────────────────────────────────────────────
+  function loadOrderedPrimers() {
+    return getOrderedPrimers()
+      .then((r) => setOrderedPrimers(r.primers || []))
+      .catch(console.error)
   }
 
   // ── Saved configs ────────────────────────────────────────────────────────
@@ -317,6 +333,10 @@ export default function App() {
       .filter(([, v]) => v === false)
       .map(([k]) => k)
 
+    const excludedSequences = (excludeOrdered && orderedPrimers.length > 0)
+      ? orderedPrimers.map((p) => p.sequence)
+      : []
+
     const payload = {
       template: templatePayload,
       primer_constraints: primerConstraints,
@@ -334,6 +354,7 @@ export default function App() {
       },
       num_pairs: numPairs,
       diversity_mode: diversityMode,
+      excluded_sequences: excludedSequences,
     }
 
     try {
@@ -414,7 +435,7 @@ export default function App() {
     }
   }
 
-  async function handleExport() {
+  async function handleExport({ targetName, primerNames, mapSvg }) {
     if (!results || checkedRanks.size === 0) return
     setExporting(true)
     try {
@@ -426,7 +447,9 @@ export default function App() {
           pairs: selectedPairs,
           template_info: results.template_info,
           design_metadata: results.design_metadata,
-          target_name: exportName.trim() || null,
+          target_name: targetName,
+          primer_names: primerNames,
+          map_svg: mapSvg,
         }),
       })
       if (!res.ok) {
@@ -444,6 +467,7 @@ export default function App() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+      setExportWizardOpen(false)
     } catch (err) {
       setDesignError(`Export failed: ${err.message}`)
     } finally {
@@ -576,6 +600,10 @@ export default function App() {
               setNumPairs(10)
               setDiversityMode('off')
             }}
+            excludeOrdered={excludeOrdered}
+            onExcludeOrderedChange={setExcludeOrdered}
+            orderedPrimerCount={orderedPrimers.length}
+            onOpenOrderedManager={() => setOrderedManagerOpen(true)}
           />
 
           <hr />
@@ -723,6 +751,9 @@ export default function App() {
               <span>
                 {results.design_metadata.total_candidates_screened} candidates,{' '}
                 {results.design_metadata.filtered_by_blast} filtered by BLAST
+                {results.design_metadata.excluded_pair_count > 0 && (
+                  <>, {results.design_metadata.excluded_pair_count} already-ordered</>
+                )}
               </span>
               {results.design_metadata.blast_coverage_warning && (
                 <span className="text-yellow-600">
@@ -750,10 +781,8 @@ export default function App() {
             onSelect={(pair) => setSelectedPair(selectedPair?.rank === pair.rank ? null : pair)}
             checkedRanks={checkedRanks}
             onCheckedChange={setCheckedRanks}
-            onExport={handleExport}
+            onOpenExportWizard={() => setExportWizardOpen(true)}
             exporting={exporting}
-            exportName={exportName}
-            onExportNameChange={setExportName}
           />
 
           {selectedPair && (
@@ -798,6 +827,22 @@ export default function App() {
         onGenomesChange={setGenomes}
         onGenomeSelectionChange={setSelectedGenomeIds}
         metadata={lastMetadata}
+      />
+
+      <OrderedPrimersManager
+        open={orderedManagerOpen}
+        onClose={() => setOrderedManagerOpen(false)}
+        primers={orderedPrimers}
+        onPrimersChange={loadOrderedPrimers}
+      />
+
+      <ExportWizard
+        open={exportWizardOpen}
+        onClose={() => setExportWizardOpen(false)}
+        pairs={results?.pairs?.filter((p) => checkedRanks.has(p.rank)) || []}
+        templateInfo={results?.template_info}
+        exporting={exporting}
+        onSubmit={handleExport}
       />
     </div>
   )

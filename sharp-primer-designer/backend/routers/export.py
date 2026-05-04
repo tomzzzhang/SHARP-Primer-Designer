@@ -32,6 +32,12 @@ class ExportRequest(BaseModel):
     scale: str = "25 nm"
     purification: str = "STD"
     target_name: Optional[str] = None  # Override for naming; defaults to template name
+    # Per-primer name overrides keyed by str(rank): {"1": {"forward": "MyName_F", "reverse": "MyName_R"}}.
+    # Missing entries fall back to the auto-generated `{target_name}_P{rank}_{F|R}` pattern.
+    primer_names: Optional[dict[str, dict[str, str]]] = None
+    # Pre-rendered SVG of the position map for the exported pairs. When present, written
+    # into the zip as `{target_name}_primer_map_{date}.svg`.
+    map_svg: Optional[str] = None
 
 
 def _sanitize_name(name: str) -> str:
@@ -89,7 +95,31 @@ def _format_tm_notes(primer) -> str:
     return ". ".join(parts)
 
 
-def _build_idt_xlsx(pairs: list[PairResult], target_name: str, scale: str, purification: str) -> bytes:
+def _resolve_primer_name(
+    rank: int,
+    direction: str,
+    target_name: str,
+    primer_names: Optional[dict[str, dict[str, str]]],
+) -> str:
+    """Return sanitized primer name, honoring per-primer overrides when present."""
+    default = f"{target_name}_P{rank}_{direction}"
+    if primer_names:
+        entry = primer_names.get(str(rank))
+        if entry:
+            key = "forward" if direction == "F" else "reverse"
+            override = entry.get(key)
+            if override and override.strip():
+                return _sanitize_name(override)
+    return _sanitize_name(default)
+
+
+def _build_idt_xlsx(
+    pairs: list[PairResult],
+    target_name: str,
+    scale: str,
+    purification: str,
+    primer_names: Optional[dict[str, dict[str, str]]] = None,
+) -> bytes:
     """Generate IDT Bulk Input .xlsx file."""
     from openpyxl import Workbook
 
@@ -101,9 +131,8 @@ def _build_idt_xlsx(pairs: list[PairResult], target_name: str, scale: str, purif
     ws.append(["Name", "Sequence", "Scale", "Purification"])
 
     for pair in pairs:
-        pair_id = f"P{pair.rank}"
-        fwd_name = _sanitize_name(f"{target_name}_{pair_id}_F")
-        rev_name = _sanitize_name(f"{target_name}_{pair_id}_R")
+        fwd_name = _resolve_primer_name(pair.rank, "F", target_name, primer_names)
+        rev_name = _resolve_primer_name(pair.rank, "R", target_name, primer_names)
         ws.append([fwd_name, pair.forward.sequence, scale, purification])
         ws.append([rev_name, pair.reverse.sequence, scale, purification])
 
@@ -122,6 +151,7 @@ def _build_notion_record(
     template_info: TemplateInfo,
     design_metadata: DesignMetadata,
     target_name: str,
+    primer_names: Optional[dict[str, dict[str, str]]] = None,
 ) -> dict:
     """Build the structured Notion record JSON per PRIMER_DESIGNER_CONTEXT.md schema."""
     design_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -145,7 +175,7 @@ def _build_notion_record(
         pair_id = f"P{pair.rank}"
 
         for direction, primer in [("F", pair.forward), ("R", pair.reverse)]:
-            primer_name = _sanitize_name(f"{target_name}_{pair_id}_{direction}")
+            primer_name = _resolve_primer_name(pair.rank, direction, target_name, primer_names)
             oligo_entry = {
                 "database": "Oligo Databank (7f2d0d38)",
                 "entry": {
@@ -164,8 +194,8 @@ def _build_notion_record(
             }
             oligo_entries.append(oligo_entry)
 
-        fwd_name = _sanitize_name(f"{target_name}_{pair_id}_F")
-        rev_name = _sanitize_name(f"{target_name}_{pair_id}_R")
+        fwd_name = _resolve_primer_name(pair.rank, "F", target_name, primer_names)
+        rev_name = _resolve_primer_name(pair.rank, "R", target_name, primer_names)
 
         target_region_str = ""
         if template_info.target_region:
@@ -252,8 +282,12 @@ def export_primers(req: ExportRequest):
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
 
     # Build files
-    xlsx_bytes = _build_idt_xlsx(req.pairs, target_name, req.scale, req.purification)
-    notion_record = _build_notion_record(req.pairs, req.template_info, req.design_metadata, target_name)
+    xlsx_bytes = _build_idt_xlsx(
+        req.pairs, target_name, req.scale, req.purification, req.primer_names
+    )
+    notion_record = _build_notion_record(
+        req.pairs, req.template_info, req.design_metadata, target_name, req.primer_names
+    )
     md_summary = _build_markdown_summary(notion_record)
 
     # Include markdown summary in the JSON
@@ -268,6 +302,11 @@ def export_primers(req: ExportRequest):
         zf.writestr(f"{folder}/{target_name}_primer_order_{date_str}.xlsx", xlsx_bytes)
         zf.writestr(f"{folder}/{target_name}_primer_record_{date_str}.json", json_bytes)
         zf.writestr(f"{folder}/{target_name}_primer_summary_{date_str}.md", md_summary)
+        if req.map_svg and req.map_svg.strip():
+            zf.writestr(
+                f"{folder}/{target_name}_primer_map_{date_str}.svg",
+                req.map_svg.encode("utf-8"),
+            )
 
     zip_buf.seek(0)
     return StreamingResponse(
