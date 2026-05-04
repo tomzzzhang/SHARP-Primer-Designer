@@ -1,6 +1,6 @@
 # SHARP Primer Designer
 
-**Last Updated:** 2026-04-29 PST — Claude
+**Last Updated:** 2026-05-04 PST — Claude
 
 A local web application for designing and analyzing primer pairs for SHARP Diagnostics' isothermal amplification platform.
 

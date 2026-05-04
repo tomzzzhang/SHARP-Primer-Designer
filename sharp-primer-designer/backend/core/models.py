@@ -174,6 +174,7 @@ class DesignRequest(BaseModel):
     specificity: SpecificityConfig = SpecificityConfig()
     num_pairs: int = 10
     diversity_mode: str = "off"  # "off", "sparse", "spread", "coverage"
+    excluded_sequences: list[str] = []  # Already-ordered primer sequences to filter out post-primer3
 
 
 class TemplateInfo(BaseModel):
@@ -188,6 +189,7 @@ class DesignMetadata(BaseModel):
     blast_version: Optional[str] = None
     total_candidates_screened: int
     filtered_by_blast: int
+    excluded_pair_count: int = 0  # pairs dropped because they matched the ordered-primers library
     blast_coverage_warning: bool = False
     timestamp: str
 
@@ -266,6 +268,32 @@ class SavedSequence(BaseModel):
 
 class SavedSequencesResponse(BaseModel):
     sequences: list[SavedSequence]
+
+
+# ─── Ordered primers library (exclusion list) ────────────────────────────────
+
+class OrderedPrimer(BaseModel):
+    id: str = ""
+    sequence: str                       # Stored uppercase, whitespace-stripped
+    name: Optional[str] = None
+    notes: Optional[str] = None
+    added_date: Optional[str] = None    # ISO 8601 timestamp
+    source: Optional[str] = None        # "manual" | "imported_json" | "imported_xlsx"
+
+
+class OrderedPrimersResponse(BaseModel):
+    primers: list[OrderedPrimer]
+
+
+class BulkOrderedPrimersRequest(BaseModel):
+    sequences: list[str]                # Raw input — server cleans and dedupes
+    source: str = "manual"
+
+
+class BulkOrderedPrimersResponse(BaseModel):
+    added: int
+    skipped: int
+    primers: list[OrderedPrimer]
 
 
 # ─── Sequence fetch API ───────────────────────────────────────────────────────

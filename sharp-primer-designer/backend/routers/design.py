@@ -158,6 +158,7 @@ async def run_design_stream(req: DesignRequest):
                 specificity=req.specificity,
                 num_return=req.num_pairs,
                 diversity_mode=req.diversity_mode,
+                excluded_sequences=req.excluded_sequences,
                 on_progress=on_progress,
             )
             result = DesignResponse(
@@ -228,6 +229,7 @@ def run_design(req: DesignRequest):
         specificity=req.specificity,
         num_return=req.num_pairs,
         diversity_mode=req.diversity_mode,
+        excluded_sequences=req.excluded_sequences,
     )
 
     return DesignResponse(

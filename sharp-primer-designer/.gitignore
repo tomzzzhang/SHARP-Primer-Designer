@@ -20,6 +20,7 @@ backend/data/genomes/*/
 # User data files (seeded from *.defaults.json on first run)
 backend/data/sequences.json
 backend/data/configs.json
+backend/data/ordered_primers.json
 
 # Environment / secrets
 .env

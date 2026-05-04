@@ -187,6 +187,10 @@ export default function ConstraintsPanel({
   onLoadConfig,
   onDeleteConfig,
   onResetDefaults,
+  excludeOrdered,
+  onExcludeOrderedChange,
+  orderedPrimerCount = 0,
+  onOpenOrderedManager,
 }) {
   const [configName, setConfigName] = useState('')
   const [configError, setConfigError] = useState('')
@@ -391,6 +395,38 @@ export default function ConstraintsPanel({
           <option value="spread">Spread (25 bp spacing)</option>
           <option value="coverage">Coverage (region bins)</option>
         </select>
+      </div>
+
+      {/* Ordered primers exclusion */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground mb-2">
+          Ordered Primers
+        </h3>
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludeOrdered !== false}
+              onChange={(e) => onExcludeOrderedChange(e.target.checked)}
+              className="w-3 h-3 accent-primary cursor-pointer"
+            />
+            <span className="text-xs flex items-center gap-1">
+              Exclude already-ordered primers
+              <HelpDot tip="When enabled, any candidate pair containing a primer sequence already in your ordered-primers library is dropped before BLAST. Prevents accidentally re-ordering primers you already have." />
+            </span>
+          </label>
+          <button
+            onClick={onOpenOrderedManager}
+            className="w-full px-2 py-1 text-xs border rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Manage library ({orderedPrimerCount})
+          </button>
+          {excludeOrdered !== false && orderedPrimerCount === 0 && (
+            <p className="text-[10px] text-muted-foreground italic">
+              Library is empty — no exclusions will be applied.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

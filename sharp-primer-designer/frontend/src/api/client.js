@@ -54,6 +54,33 @@ export const getSequences = () => request('GET', '/sequences')
 export const saveSequence = (payload) => request('POST', '/sequences', payload)
 export const deleteSequence = (id) => request('DELETE', `/sequences/${id}`)
 
+// ── Ordered primers (exclusion library) ──────────────────────────────────────
+export const getOrderedPrimers = () => request('GET', '/ordered_primers')
+export const bulkAddOrderedPrimers = (sequences, source = 'manual') =>
+  request('POST', '/ordered_primers/bulk', { sequences, source })
+export const deleteOrderedPrimer = (id) =>
+  request('DELETE', `/ordered_primers/${id}`)
+export const clearOrderedPrimers = () =>
+  request('DELETE', '/ordered_primers?confirm=true')
+
+export async function importOrderedPrimers(file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${BASE}/ordered_primers/import`, {
+    method: 'POST',
+    body: fd,
+  })
+  if (!res.ok) {
+    let detail = res.statusText
+    try {
+      const err = await res.json()
+      detail = err.detail || detail
+    } catch (_) {}
+    throw new Error(`${res.status} ${detail}`)
+  }
+  return res.json()
+}
+
 // ── Sequence fetch ─────────────────────────────────────────────────────────────
 export const fetchSequence = (accession) =>
   request('POST', '/sequence/fetch', { accession })

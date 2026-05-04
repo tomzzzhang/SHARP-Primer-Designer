@@ -167,6 +167,7 @@ def design_primers(
     num_return: int = 10,
     diversity_mode: str = "off",
     overshoot_factor: int = 3,
+    excluded_sequences: list[str] | None = None,
     on_progress=None,  # Optional[Callable[[str, str, float], None]]
 ) -> tuple[list[PairResult], DesignMetadata]:
     """Run the full primer design pipeline.
@@ -407,6 +408,28 @@ def design_primers(
     filtered_by_blast = 0
     blast_warning = False
 
+    # ── Exclude already-ordered primers ────────────────────────────────────────
+    # Drop pairs where either primer's 5'->3' sequence (case-insensitive) is on
+    # the user's "already ordered" list. Runs before BLAST so we don't pay the
+    # BLAST cost for primers we'd reject anyway.
+    excluded_pair_count = 0
+    if excluded_sequences:
+        excluded_set = {s.strip().upper() for s in excluded_sequences if s.strip()}
+        if excluded_set:
+            before = len(candidates)
+            candidates = [
+                (penalty, pair) for penalty, pair in candidates
+                if pair.forward.sequence.upper() not in excluded_set
+                and pair.reverse.sequence.upper() not in excluded_set
+            ]
+            excluded_pair_count = before - len(candidates)
+            if excluded_pair_count:
+                _progress(
+                    "filter_excluded",
+                    f"Excluded {excluded_pair_count} pair(s) matching ordered primers",
+                    50,
+                )
+
     # ── BLAST screening (batched + thermodynamic filtering) ────────────────────
     if specificity.enabled and specificity.genome_ids:
         # Collect all unique primer sequences across all candidates
@@ -493,6 +516,7 @@ def design_primers(
         blast_version=blast_version() if specificity.enabled else None,
         total_candidates_screened=total_candidates,
         filtered_by_blast=filtered_by_blast,
+        excluded_pair_count=excluded_pair_count,
         blast_coverage_warning=blast_warning,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
