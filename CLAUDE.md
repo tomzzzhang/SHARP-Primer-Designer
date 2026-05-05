@@ -146,7 +146,7 @@ After primer3 returns candidates and Tm grids are computed, but **before** BLAST
 - Position diversity modes: Off, Sparse, Spread, Coverage
 - Multi-method Tm analysis (4 methods × multiple condition profiles)
 - BLAST+ off-target screening with per-hit thermodynamic Tm filtering
-- Export wizard: review/rename each forward + reverse primer before export; target name auto-propagates into untouched fields. Pick IDT synthesis scale (25nm / 100nm / 250nm / 1um) and purification (STD / PAGE / HPLC) — values written verbatim into the bulk-input Scale and Purification columns (no whitespace; IDT rejects `"25 nm"` as an invalid scale code). Bundles IDT bulk order sheet (.xlsx), Notion record (.json), markdown summary (.md), and a position map (.svg) of the selected pairs.
+- Export wizard: review/rename each forward + reverse primer before export; target name auto-propagates into untouched fields. Pick IDT synthesis scale (25nm / 100nm / 250nm / 1um / 5um / 10um, plus Ultramer / specialty: 4nmU / 20nmU / PU / 25nmS) and purification (STD / PAGE / HPLC, plus specialty: IEHPLC / RNASE / DUALHPLC / PAGEHPLC) — values written verbatim into the bulk-input Scale and Purification columns and validated server-side against the authoritative IDT code set (HTTP 422 on unknown codes; prevents IDT silently coercing the value with the "An invalid scale code was used" warning). Bundles IDT bulk order sheet (.xlsx), Notion record (.json), markdown summary (.md), and a position map (.svg) of the selected pairs.
 - Import: reload previously exported records
 - Saved configs (named parameter presets)
 - Saved sequences library

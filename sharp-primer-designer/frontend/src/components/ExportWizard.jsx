@@ -197,10 +197,20 @@ export default function ExportWizard({ open, onClose, pairs, templateInfo, expor
                 disabled={exporting}
                 className="w-full border rounded px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="25nm">25 nmole</option>
-                <option value="100nm">100 nmole</option>
-                <option value="250nm">250 nmole</option>
-                <option value="1um">1 µmole</option>
+                <optgroup label="Standard">
+                  <option value="25nm">25 nmole (25nm)</option>
+                  <option value="100nm">100 nmole (100nm)</option>
+                  <option value="250nm">250 nmole (250nm)</option>
+                  <option value="1um">1 µmole (1um)</option>
+                  <option value="5um">5 µmole (5um)</option>
+                  <option value="10um">10 µmole (10um)</option>
+                </optgroup>
+                <optgroup label="Ultramer / specialty">
+                  <option value="4nmU">Ultramer 4 nmole (4nmU)</option>
+                  <option value="20nmU">Ultramer 20 nmole (20nmU)</option>
+                  <option value="PU">Plate Universal (PU)</option>
+                  <option value="25nmS">25 nmole, modified (25nmS)</option>
+                </optgroup>
               </select>
               <p className="text-[10px] text-muted-foreground mt-1">
                 IDT 25 nmole only supports STD desalting.
@@ -216,9 +226,17 @@ export default function ExportWizard({ open, onClose, pairs, templateInfo, expor
                 disabled={exporting}
                 className="w-full border rounded px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="STD">Standard Desalt (STD)</option>
-                <option value="PAGE">PAGE</option>
-                <option value="HPLC">HPLC</option>
+                <optgroup label="Standard">
+                  <option value="STD">Standard Desalt (STD)</option>
+                  <option value="PAGE">PAGE</option>
+                  <option value="HPLC">HPLC</option>
+                </optgroup>
+                <optgroup label="Specialty">
+                  <option value="IEHPLC">Ion-Exchange HPLC (IEHPLC)</option>
+                  <option value="RNASE">RNase-Free HPLC (RNASE)</option>
+                  <option value="DUALHPLC">Dual HPLC (DUALHPLC)</option>
+                  <option value="PAGEHPLC">PAGE + HPLC (PAGEHPLC)</option>
+                </optgroup>
               </select>
               <p className="text-[10px] text-muted-foreground mt-1">
                 Written verbatim into the IDT bulk-input Scale / Purification columns.
