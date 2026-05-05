@@ -29,7 +29,7 @@ class ExportRequest(BaseModel):
     pairs: list[PairResult]
     template_info: TemplateInfo
     design_metadata: DesignMetadata
-    scale: str = "25 nm"
+    scale: str = "25nm"
     purification: str = "STD"
     target_name: Optional[str] = None  # Override for naming; defaults to template name
     # Per-primer name overrides keyed by str(rank): {"1": {"forward": "MyName_F", "reverse": "MyName_R"}}.

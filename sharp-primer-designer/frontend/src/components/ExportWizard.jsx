@@ -33,6 +33,8 @@ export default function ExportWizard({ open, onClose, pairs, templateInfo, expor
   // Presence of a string value means the user has edited that field — it stops
   // following targetName until they reset it.
   const [custom, setCustom] = useState({})
+  const [scale, setScale] = useState('25nm')
+  const [purification, setPurification] = useState('STD')
   const mapDivRef = useRef(null)
 
   // Reset state on the close → open transition only. We intentionally don't
@@ -43,6 +45,8 @@ export default function ExportWizard({ open, onClose, pairs, templateInfo, expor
     if (open && !wasOpenRef.current) {
       setTargetName(templateInfo?.name || '')
       setCustom({})
+      setScale('25nm')
+      setPurification('STD')
     }
     wasOpenRef.current = open
   }, [open, templateInfo?.name])
@@ -128,6 +132,8 @@ export default function ExportWizard({ open, onClose, pairs, templateInfo, expor
       targetName: targetName.trim() || null,
       primerNames: Object.keys(primerNames).length > 0 ? primerNames : null,
       mapSvg,
+      scale,
+      purification,
     })
   }
 
@@ -177,6 +183,47 @@ export default function ExportWizard({ open, onClose, pairs, templateInfo, expor
               Names are sanitized to alphanumeric, underscore, and hyphen on export (max 50 chars).
               Editing this field updates any primer names you haven&rsquo;t customized below.
             </p>
+          </div>
+
+          {/* IDT order options */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-foreground block mb-1">
+                Synthesis scale
+              </label>
+              <select
+                value={scale}
+                onChange={(e) => setScale(e.target.value)}
+                disabled={exporting}
+                className="w-full border rounded px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="25nm">25 nmole</option>
+                <option value="100nm">100 nmole</option>
+                <option value="250nm">250 nmole</option>
+                <option value="1um">1 µmole</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                IDT 25 nmole only supports STD desalting.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-foreground block mb-1">
+                Purification
+              </label>
+              <select
+                value={purification}
+                onChange={(e) => setPurification(e.target.value)}
+                disabled={exporting}
+                className="w-full border rounded px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="STD">Standard Desalt (STD)</option>
+                <option value="PAGE">PAGE</option>
+                <option value="HPLC">HPLC</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Written verbatim into the IDT bulk-input Scale / Purification columns.
+              </p>
+            </div>
           </div>
 
           {/* Map preview */}
