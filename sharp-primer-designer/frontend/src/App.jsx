@@ -435,7 +435,7 @@ export default function App() {
     }
   }
 
-  async function handleExport({ targetName, primerNames, mapSvg }) {
+  async function handleExport({ targetName, primerNames, mapSvg, scale, purification }) {
     if (!results || checkedRanks.size === 0) return
     setExporting(true)
     try {
@@ -450,6 +450,8 @@ export default function App() {
           target_name: targetName,
           primer_names: primerNames,
           map_svg: mapSvg,
+          scale,
+          purification,
         }),
       })
       if (!res.ok) {

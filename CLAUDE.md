@@ -1,6 +1,6 @@
 # CLAUDE.md — SHARP Primer Designer
 
-**Last Updated:** 2026-05-04 PST — Claude
+**Last Updated:** 2026-05-05 PST — Claude
 
 ## Session Start Protocol
 
@@ -146,7 +146,7 @@ After primer3 returns candidates and Tm grids are computed, but **before** BLAST
 - Position diversity modes: Off, Sparse, Spread, Coverage
 - Multi-method Tm analysis (4 methods × multiple condition profiles)
 - BLAST+ off-target screening with per-hit thermodynamic Tm filtering
-- Export wizard: review/rename each forward + reverse primer before export; target name auto-propagates into untouched fields. Bundles IDT bulk order sheet (.xlsx), Notion record (.json), markdown summary (.md), and a position map (.svg) of the selected pairs.
+- Export wizard: review/rename each forward + reverse primer before export; target name auto-propagates into untouched fields. Pick IDT synthesis scale (25nm / 100nm / 250nm / 1um) and purification (STD / PAGE / HPLC) — values written verbatim into the bulk-input Scale and Purification columns (no whitespace; IDT rejects `"25 nm"` as an invalid scale code). Bundles IDT bulk order sheet (.xlsx), Notion record (.json), markdown summary (.md), and a position map (.svg) of the selected pairs.
 - Import: reload previously exported records
 - Saved configs (named parameter presets)
 - Saved sequences library

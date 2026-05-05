@@ -1,6 +1,6 @@
 # SHARP Primer Designer
 
-**Last Updated:** 2026-05-04 PST — Claude
+**Last Updated:** 2026-05-05 PST — Claude
 
 A local web application for designing and analyzing primer pairs for SHARP Diagnostics' isothermal amplification platform.
 
@@ -13,7 +13,7 @@ A local web application for designing and analyzing primer pairs for SHARP Diagn
 - **Multi-method Tm analysis** -- SantaLucia (primer3), SantaLucia (Biopython), Owczarzy 2008, Wallace rule
 - **Multiple condition profiles** -- compare Tm across different buffer conditions (SHARP CutSmart, IDT, NEB, or custom)
 - **BLAST+ specificity screening** -- local off-target detection with thermodynamic Tm filtering per hit
-- **Export package** -- zip with IDT bulk order sheet (.xlsx), Notion record (.json), and summary (.md)
+- **Export package** -- zip with IDT bulk order sheet (.xlsx), Notion record (.json), summary (.md), and position map (.svg). Pick synthesis scale (25nm / 100nm / 250nm / 1um) and purification (STD / PAGE / HPLC) per export — written in IDT's exact bulk-input codes so the file uploads cleanly at idtdna.com.
 - **Import** -- reload previously exported records
 - **Saved configs** -- save/load named parameter presets
 - **Settings persistence** -- all constraints and settings saved across browser sessions
