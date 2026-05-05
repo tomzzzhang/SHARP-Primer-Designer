@@ -24,6 +24,19 @@ from core.models import (
 
 router = APIRouter(prefix="/api", tags=["export"])
 
+# IDT bulk-input accepts a fixed code set for the Scale and Purification columns.
+# Anything else is silently coerced to the IDT default with the warning
+# "An invalid scale code was used. The default will be used." We validate
+# server-side so the user gets a 422 instead of a confusing IDT-side coercion.
+# Source: https://www.idtdna.com/site/order/oligoentry bulk-input form.
+IDT_VALID_SCALES = frozenset({
+    "25nm", "100nm", "250nm", "1um", "5um", "10um",
+    "4nmU", "20nmU", "PU", "25nmS",
+})
+IDT_VALID_PURIFICATIONS = frozenset({
+    "STD", "PAGE", "HPLC", "IEHPLC", "RNASE", "DUALHPLC", "PAGEHPLC",
+})
+
 
 class ExportRequest(BaseModel):
     pairs: list[PairResult]
@@ -274,6 +287,19 @@ def export_primers(req: ExportRequest):
     """Generate IDT order sheet + Notion record as a zip download."""
     if not req.pairs:
         raise HTTPException(400, "No primer pairs to export")
+
+    if req.scale not in IDT_VALID_SCALES:
+        raise HTTPException(
+            422,
+            f"Invalid IDT scale code: {req.scale!r}. "
+            f"Valid codes: {sorted(IDT_VALID_SCALES)}.",
+        )
+    if req.purification not in IDT_VALID_PURIFICATIONS:
+        raise HTTPException(
+            422,
+            f"Invalid IDT purification code: {req.purification!r}. "
+            f"Valid codes: {sorted(IDT_VALID_PURIFICATIONS)}.",
+        )
 
     # Derive target name
     target_name = req.target_name or req.template_info.name or "Target"
